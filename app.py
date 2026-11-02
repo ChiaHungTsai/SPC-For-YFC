@@ -376,7 +376,7 @@ for stage_label, raw_name in stages_dict.items():
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱與取樣點/規格選單 ====================
+# ==================== 3. 樣品名稱與取樣點/規格選單 (左右欄位權重設為相等) ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -450,7 +450,7 @@ with cols_param[1]:
         label_visibility="collapsed"
     )
 
-final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list and selected_param != "請先選擇製程階段" else pd.DataFrame()
+final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list and selected_param != "請先選擇樣品名稱" else pd.DataFrame()
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # ==================== 5. 檢驗日期區間選擇 ====================
@@ -645,24 +645,41 @@ if len(clean_data) > 0:
     st.markdown(summary_title_html, unsafe_allow_html=True)
     st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
     
-    # 改用 Streamlit 原生 st.metric 徹底消除 DOM 衝突
+    def render_custom_metric(label, value, bg_color, border_color, label_color):
+        st.markdown(f"""
+            <div style="
+                background-color: {bg_color};
+                border: 1.5px solid {border_color};
+                padding: 4px 8px;
+                border-radius: 6px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                height: 52px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            ">
+                <div style="color: {label_color}; font-size: 10px; font-weight: 600; line-height: 1.2;">{label}</div>
+                <div style="color: #000000; font-size: 14px; font-weight: 700; line-height: 1.3;">{value}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
     m1, m2, m3, m4, m5, m6, m7, m8 = st.columns(8)
     with m1:
-        st.metric("有效樣本數 (n)", f"{n:,}")
+        render_custom_metric("有效樣本數 (n)", f"{n:,}", "#ffffff", "#cbd5e1", "#000000")
     with m2:
-        st.metric("平均值 (Mean)", fmt_str.format(mean_val))
+        render_custom_metric("平均值 (Mean)", fmt_str.format(mean_val), "#f0fdf4", "#10b981", "#047857")
     with m3:
-        st.metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places))
+        render_custom_metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places), "#ffffff", "#cbd5e1", "#000000")
     with m4:
-        st.metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A")
+        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000")
     with m5:
-        st.metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A")
+        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c")
     with m6:
-        st.metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A")
+        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c")
     with m7:
-        st.metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A")
+        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c")
     with m8:
-        st.metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A")
+        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c")
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
@@ -766,7 +783,7 @@ if len(clean_data) > 0:
             spikedash="dash"
         )
     )
-    st.plotly_chart(fig, use_container_width=True, key="spc_main_chart")
+    st.plotly_chart(fig, use_container_width=True)
 
     abnormal_df = clean_data[clean_data["異常狀況"] != "正常"].copy()
     
@@ -819,7 +836,7 @@ if len(clean_data) > 0:
         st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
 
     with st.expander("點此查看該項目的完整歷史數據明細"):
-        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
+        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True)
         
 else:
     st.warning("該篩選條件下沒有對應的數據。")
