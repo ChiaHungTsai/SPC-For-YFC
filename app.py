@@ -635,7 +635,7 @@ if len(clean_data) > 0:
 
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
-    # 1. 統計摘要標題 (加入唯一的 key 避免 DOM 衝突)
+    # 1. 統計摘要標題
     spec_display_part = f" ➔ <span style='color: #dc2626;'>{selected_spec}</span>" if selected_spec else ""
     summary_title_html = f"""
     <div class="highlight-title-box">
@@ -645,41 +645,24 @@ if len(clean_data) > 0:
     st.markdown(summary_title_html, unsafe_allow_html=True)
     st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
     
-    def render_custom_metric(label, value, bg_color, border_color, label_color, unique_key):
-        st.markdown(f"""
-            <div key="{unique_key}" style="
-                background-color: {bg_color};
-                border: 1.5px solid {border_color};
-                padding: 4px 8px;
-                border-radius: 6px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                height: 52px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            ">
-                <div style="color: {label_color}; font-size: 10px; font-weight: 600; line-height: 1.2;">{label}</div>
-                <div style="color: #000000; font-size: 14px; font-weight: 700; line-height: 1.3;">{value}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
+    # 改用 Streamlit 原生 st.metric 徹底消除 DOM 衝突
     m1, m2, m3, m4, m5, m6, m7, m8 = st.columns(8)
     with m1:
-        render_custom_metric("有效樣本數 (n)", f"{n:,}", "#ffffff", "#cbd5e1", "#000000", "m1")
+        st.metric("有效樣本數 (n)", f"{n:,}")
     with m2:
-        render_custom_metric("平均值 (Mean)", fmt_str.format(mean_val), "#f0fdf4", "#10b981", "#047857", "m2")
+        st.metric("平均值 (Mean)", fmt_str.format(mean_val))
     with m3:
-        render_custom_metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places), "#ffffff", "#cbd5e1", "#000000", "m3")
+        st.metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places))
     with m4:
-        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
+        st.metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A")
     with m5:
-        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m5")
+        st.metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A")
     with m6:
-        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m6")
+        st.metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A")
     with m7:
-        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m7")
+        st.metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A")
     with m8:
-        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m8")
+        st.metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A")
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
