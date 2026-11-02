@@ -199,26 +199,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. 雲端相對路徑資料管理 (已從 D:\SPC_Data 改為專案內的 data 資料夾)
-DATA_DIR = "data"
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+# 3. Google 試算表遠端 CSV 讀取設定
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgSWa6LTNxRQYImmAZkHX2JbsNkuROSpb_4Q3u6VJ05k72wsTjQ3eq8TMRtn3JpMEg59jlqYqoTk0_/pub?gid=729038536&single=true&output=csv"
 
-files = [f for f in os.listdir(DATA_DIR) if f.endswith(('.csv', '.xlsx', '.xls'))]
-
-@st.cache_data
-def load_and_preprocess_data(file_path, mtime):
-    if file_path.endswith('.csv'):
-        for enc in ['utf-8', 'utf-8-sig', 'big5', 'cp950']:
-            try:
-                temp_df = pd.read_csv(file_path, encoding=enc, dtype=str)
-                break
-            except UnicodeDecodeError:
-                continue
-        else:
-            temp_df = pd.read_csv(file_path, encoding='latin1', dtype=str)
-    else:
-        temp_df = pd.read_excel(file_path, dtype=str)
+@st.cache_data(ttl=60)
+def load_and_preprocess_data(url):
+    try:
+        temp_df = pd.read_csv(url, dtype=str)
+    except Exception as e:
+        st.error(f"讀取 Google 試算表失敗，請檢查網路連線或共用權限設定。錯誤訊息: {e}")
+        st.stop()
         
     temp_df.columns = [c.strip() for c in temp_df.columns]
     
@@ -246,13 +236,7 @@ def load_and_preprocess_data(file_path, mtime):
             
     return temp_df
 
-if len(files) == 0:
-    st.error(f"在專案的 `{DATA_DIR}` 目錄中找不到任何數據檔案，請確認是否有將資料放入 data 資料夾中！")
-    st.stop()
-
-file_path = os.path.join(DATA_DIR, files[0])
-file_mtime = os.path.getmtime(file_path)
-df = load_and_preprocess_data(file_path, file_mtime)
+df = load_and_preprocess_data(GOOGLE_SHEET_CSV_URL)
 
 required_cols = ["單位", "階段", "樣品名稱", "分析項目", "測定值"]
 for rc in required_cols:
@@ -804,7 +788,10 @@ if len(clean_data) > 0:
     abnormal_df = clean_data[clean_data["異常狀況"] != "正常"].copy()
     
     if len(abnormal_df) > 0:
-        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 (共 {len(abnormal_df)} 筆違規點)</div>', unsafe_allow_html=True)
+        spec_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出規格範圍"])
+        control_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出管制範圍"])
+        
+        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 (共 {len(abnormal_df)} 筆違規點：超出規格範圍 {spec_count} 筆，超出管制範圍 {control_count} 筆)</div>', unsafe_allow_html=True)
         
         col_name_mapping = {
             "異常狀況": "異常狀況",
