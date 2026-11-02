@@ -1,0 +1,855 @@
+import os
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+from datetime import date
+
+# 1. 網頁基本設定 (寬螢幕、隱藏側邊欄)
+st.set_page_config(page_title="義芳化學品保科 - SPC 統計製程管制儀表板", layout="wide", initial_sidebar_state="collapsed")
+
+# 2. 自訂 CSS
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {display: none;}
+    .main { background-color: #f8fafc; color: #1e293b; }
+    
+    .block-container {
+        max-width: 100% !important;
+        padding-top: 3.5rem !important;
+        padding-bottom: 1.5rem !important;
+        padding-right: 20px !important;
+        padding-left: 20px !important;
+    }
+    
+    /* 主標題設計 */
+    .main-header-container {
+        background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+        padding: 14px 20px;
+        border-radius: 8px;
+        color: #ffffff;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .main-header-title {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: #ffffff;
+        margin: 0;
+        line-height: 1.3;
+    }
+    .main-header-subtitle {
+        font-size: 11px;
+        color: #93c5fd;
+        margin-top: 3px;
+        letter-spacing: 0.5px;
+        line-height: 1.2;
+    }
+    
+    div[data-baseweb="popover"] {
+        width: max-content !important;
+        min-width: 280px !important;
+    }
+    div[data-baseweb="popover"] div[role="listbox"] {
+        max-height: 350px !important;
+    }
+    div[data-baseweb="popover"] div[role="listbox"] div {
+        white-space: normal !important;
+        word-break: break-all !important;
+        height: auto !important;
+    }
+    
+    .custom-alert-table {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: #ffffff;
+        font-size: 14px;
+        color: #1e293b;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 12px;
+        table-layout: fixed;
+    }
+    .custom-alert-table th, .custom-alert-table td {
+        text-align: center !important;
+        padding: 10px 8px;
+        border-bottom: 1px solid #e2e8f0;
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .custom-alert-table th {
+        background-color: #f1f5f9;
+        color: #334155;
+        font-weight: 700;
+        border-bottom: 2px solid #cbd5e1;
+    }
+    .custom-alert-table tr:hover {
+        background-color: #f8fafc;
+    }
+    
+    .row-label {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e3a8a;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        height: 36px;
+        padding-left: 2px;
+        white-space: nowrap;
+    }
+    
+    .inline-sub-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #000000;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        height: 36px;
+        padding-right: 8px;
+        white-space: nowrap;
+    }
+    
+    /* 統一所有下方按鈕的大小與高度 (36px) */
+    .stButton > button {
+        width: 100% !important;
+        height: 36px !important;
+        padding: 2px 6px !important;
+        font-size: 13px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
+        white-space: nowrap !important;
+    }
+    
+    .refresh-btn-fixed {
+        margin-top: 4px; 
+    }
+    .refresh-btn-fixed button {
+        width: 120px !important;
+        max-width: 120px !important;
+        height: 52px !important;
+        min-height: 52px !important;
+        max-height: 52px !important;
+        padding: 2px 6px !important;
+        font-size: 13px !important;
+        white-space: nowrap !important;
+    }
+    
+    .stButton > button:disabled {
+        background: repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 6px, #94a3b8 6px, #94a3b8 12px) !important;
+        color: #334155 !important;
+        border: 2px solid #475569 !important;
+        cursor: not-allowed !important;
+        opacity: 0.95 !important;
+        font-weight: 700 !important;
+    }
+    
+    div.stButton > button[kind="secondary"] {
+        background-color: #dbeafe !important;
+        color: #1e40af !important;
+        border: 1.5px solid #3b82f6 !important;
+        font-weight: 700 !important;
+    }
+    div.stButton > button[kind="secondary"]:hover {
+        background-color: #bfdbfe !important;
+        border-color: #2563eb !important;
+        color: #1e3a8a !important;
+    }
+    
+    div[data-baseweb="select"] > div {
+        min-height: 36px !important;
+        height: 36px !important;
+    }
+    
+    div[data-baseweb="input"] > div {
+        min-height: 36px !important;
+        height: 36px !important;
+    }
+    
+    .stDateInput input {
+        height: 36px !important;
+        padding: 0px 8px !important;
+        font-size: 13px !important;
+        width: 100% !important;
+    }
+    
+    .row-spacer {
+        height: 4px;
+    }
+    
+    .highlight-title-box {
+        display: inline-block;
+        width: fit-content;
+        background-color: #fef08a;
+        border: 1px solid #fde047;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #713f12;
+        margin-bottom: 6px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 3. 雲端相對路徑資料管理 (已從 D:\SPC_Data 改為專案內的 data 資料夾)
+DATA_DIR = "data"
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
+
+files = [f for f in os.listdir(DATA_DIR) if f.endswith(('.csv', '.xlsx', '.xls'))]
+
+@st.cache_data
+def load_and_preprocess_data(file_path, mtime):
+    if file_path.endswith('.csv'):
+        for enc in ['utf-8', 'utf-8-sig', 'big5', 'cp950']:
+            try:
+                temp_df = pd.read_csv(file_path, encoding=enc, dtype=str)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            temp_df = pd.read_csv(file_path, encoding='latin1', dtype=str)
+    else:
+        temp_df = pd.read_excel(file_path, dtype=str)
+        
+    temp_df.columns = [c.strip() for c in temp_df.columns]
+    
+    prod_col = None
+    for candidate in ["樣品名稱", "成品名稱", "產品名稱"]:
+        if candidate in temp_df.columns:
+            prod_col = candidate
+            break
+            
+    if prod_col and prod_col != "樣品名稱":
+        temp_df = temp_df.rename(columns={prod_col: "樣品名稱"})
+        
+    for col in ["單位", "階段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL"]:
+        if col in temp_df.columns:
+            temp_df[col] = temp_df[col].astype(str).str.strip()
+            temp_df.loc[temp_df[col].isin(["nan", "NaN", "None", "NAT", "nat", ""]), col] = np.nan
+            
+    if "測定值" in temp_df.columns:
+        temp_df["測定值_str"] = temp_df["測定值"].astype(str).str.strip()
+        temp_df["測定值"] = pd.to_numeric(temp_df["測定值"], errors='coerce')
+        
+    for limit_col in ["USL", "LSL", "UCL", "LCL"]:
+        if limit_col in temp_df.columns:
+            temp_df[limit_col] = pd.to_numeric(temp_df[limit_col], errors='coerce')
+            
+    return temp_df
+
+if len(files) == 0:
+    st.error(f"在專案的 `{DATA_DIR}` 目錄中找不到任何數據檔案，請確認是否有將資料放入 data 資料夾中！")
+    st.stop()
+
+file_path = os.path.join(DATA_DIR, files[0])
+file_mtime = os.path.getmtime(file_path)
+df = load_and_preprocess_data(file_path, file_mtime)
+
+required_cols = ["單位", "階段", "樣品名稱", "分析項目", "測定值"]
+for rc in required_cols:
+    if rc not in df.columns:
+        st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
+        st.stop()
+
+# ==================== 狀態回呼與瞬間聯動邏輯 ====================
+def on_unit_change():
+    st.session_state.pop("selected_stage", None)
+    st.session_state.pop("current_product", None)
+    st.session_state.pop("current_spec", None)
+    st.session_state.pop("current_param", None)
+
+def on_stage_change():
+    st.session_state.pop("current_product", None)
+    st.session_state.pop("current_spec", None)
+    st.session_state.pop("current_param", None)
+
+def on_product_change():
+    st.session_state.pop("current_spec", None)
+    st.session_state.pop("current_param", None)
+
+def on_spec_change():
+    st.session_state.pop("current_param", None)
+
+# ==================== 頂部主標題與「更新資料」按鈕同行配置 ====================
+header_cols = st.columns([5.5, 1.2])
+
+with header_cols[0]:
+    st.markdown("""
+        <div class="main-header-container">
+            <div class="main-header-title">義芳化學 ｜ 品保科分析數據儀表板</div>
+            <div class="main-header-subtitle">YEE FONG CHEMICAL & INDUSTRIAL CO., LTD.</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with header_cols[1]:
+    st.markdown('<div class="refresh-btn-fixed">', unsafe_allow_html=True)
+    if st.button("🔄 更新資料", use_container_width=False):
+        st.cache_data.clear()
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+
+# ==================== 1. 製造單位按鈕群組 ====================
+grid_weights_unit = [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.8]
+fixed_units_list = [
+    "電解課",
+    "矽碳課-矽膠",
+    "矽碳課-碳酸鉀",
+    "凡立水課",
+    "精密化學課",
+    "雙氧水課",
+    "公用課"
+]
+
+available_units = df["單位"].dropna().unique().tolist() if len(df) > 0 and "單位" in df.columns else []
+
+if "selected_unit" not in st.session_state or st.session_state["selected_unit"] not in fixed_units_list:
+    if "電解課" in available_units:
+        st.session_state["selected_unit"] = "電解課"
+    else:
+        st.session_state["selected_unit"] = next((u for u in fixed_units_list if u in available_units), fixed_units_list[0])
+
+selected_unit = st.session_state["selected_unit"]
+unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
+
+cols_unit = st.columns(grid_weights_unit)
+with cols_unit[0]:
+    st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
+
+for i, unit in enumerate(fixed_units_list):
+    with cols_unit[i + 1]:
+        has_data = unit in available_units
+        is_active = (selected_unit == unit)
+        if has_data:
+            if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
+                if st.session_state["selected_unit"] != unit:
+                    st.session_state["selected_unit"] = unit
+                    on_unit_change()
+                    st.rerun()
+        else:
+            st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
+
+st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
+
+# ==================== 2. 製程階段按鈕群組 ====================
+stages_dict = {
+    "原料IQC": "原料",
+    "製程IPQC": "製程",
+    "成品FQC": "成品",
+    "出貨OQC": "出貨"
+}
+stages_list = list(stages_dict.keys())
+stages_mapping = {label: idx + 1 for idx, label in enumerate(stages_list)}
+
+if "selected_stage" not in st.session_state or st.session_state["selected_stage"] not in stages_list:
+    target_stage = None
+    priority_order = ["出貨OQC", "成品FQC", "製程IPQC", "原料IQC"]
+    for p_stage in priority_order:
+        raw_val = stages_dict[p_stage]
+        if any(unit_df["階段"].str.contains(raw_val, na=False) | (unit_df["階段"] == p_stage)):
+            target_stage = p_stage
+            break
+    if target_stage is None and stages_list:
+        target_stage = stages_list[0]
+    st.session_state["selected_stage"] = target_stage
+
+selected_stage_label = st.session_state["selected_stage"]
+selected_stage_raw = stages_dict[selected_stage_label]
+
+if len(unit_df) > 0 and "階段" in unit_df.columns:
+    stage_mask = unit_df["階段"].str.contains(selected_stage_raw, na=False) | (unit_df["階段"] == selected_stage_label)
+    stage_df = unit_df[stage_mask]
+else:
+    stage_df = pd.DataFrame()
+
+cols_stage = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 3.8])
+with cols_stage[0]:
+    st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
+
+for stage_label, raw_name in stages_dict.items():
+    col_idx = stages_mapping[stage_label]
+    has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
+    with cols_stage[col_idx]:
+        if has_stage_data:
+            is_active = (selected_stage_label == stage_label)
+            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
+                if st.session_state["selected_stage"] != stage_label:
+                    st.session_state["selected_stage"] = stage_label
+                    on_stage_change()
+                    st.rerun()
+        else:
+            st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
+
+st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
+
+# ==================== 3. 樣品名稱與取樣點/規格選單 (左右欄位權重設為相等) ====================
+products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
+
+if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
+    st.session_state["current_product"] = products_list[0] if products_list else ""
+
+row_weights = [0.7, 2.8, 0.45, 0.8, 2.8, 2.2]
+cols_row3 = st.columns(row_weights)
+
+with cols_row3[0]:
+    st.markdown('<div class="row-label">樣品名稱</div>', unsafe_allow_html=True)
+with cols_row3[1]:
+    selected_product = st.selectbox(
+        "樣品名稱", 
+        products_list if products_list else ["請先選擇製程階段"], 
+        key="current_product",
+        on_change=on_product_change,
+        label_visibility="collapsed"
+    )
+
+prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_list and selected_product != "請先選擇製程階段" else pd.DataFrame()
+valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
+specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
+
+with cols_row3[3]:
+    st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
+
+with cols_row3[4]:
+    if len(specs_list) > 0:
+        if "current_spec" not in st.session_state or st.session_state["current_spec"] not in specs_list:
+            st.session_state["current_spec"] = specs_list[0]
+            
+        selected_spec = st.selectbox(
+            "取樣點/規格",
+            specs_list,
+            key="current_spec",
+            on_change=on_spec_change,
+            label_visibility="collapsed"
+        )
+        spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == selected_spec]
+    else:
+        selected_spec = None
+        st.selectbox(
+            "取樣點/規格",
+            ["無取樣點/規格資料"],
+            disabled=True,
+            key="sel_spec_disabled",
+            label_visibility="collapsed"
+        )
+        spec_df = prod_df
+
+st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
+
+# ==================== 4. 分析項目下拉選單 ====================
+params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
+
+if "current_param" not in st.session_state or st.session_state["current_param"] not in params_list:
+    default_p = next((p for p in params_list if "濃度" in p), None)
+    if default_p:
+        st.session_state["current_param"] = default_p
+    else:
+        st.session_state["current_param"] = params_list[0] if params_list else ""
+
+cols_param = st.columns(row_weights)
+with cols_param[0]:
+    st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
+with cols_param[1]:
+    selected_param = st.selectbox(
+        "分析項目", 
+        params_list if params_list else ["請先選擇樣品名稱"], 
+        key="current_param", 
+        label_visibility="collapsed"
+    )
+
+final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list and selected_param != "請先選擇樣品名稱" else pd.DataFrame()
+st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+
+# ==================== 5. 檢驗日期區間選擇 ====================
+today = date.today()
+current_year = today.year
+if today < date(current_year, 4, 1):
+    default_start_year = current_year - 1
+else:
+    default_start_year = current_year
+
+default_start = date(default_start_year, 1, 1)
+default_end = today
+
+if len(final_df) > 0 and "檢驗日期" in final_df.columns:
+    valid_dates = pd.to_datetime(final_df["檢驗日期"], errors='coerce').dt.date.dropna()
+    if not valid_dates.empty:
+        default_start = valid_dates.min()
+
+if "start_date" not in st.session_state:
+    st.session_state["start_date"] = default_start
+if "end_date" not in st.session_state:
+    st.session_state["end_date"] = default_end
+
+if st.session_state["start_date"] > st.session_state["end_date"]:
+    st.session_state["start_date"] = st.session_state["end_date"]
+
+cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
+with cols_val5[0]:
+    st.markdown('<div class="row-label">檢驗日期</div>', unsafe_allow_html=True)
+with cols_val5[1]:
+    st.markdown('<div class="inline-sub-label">開始</div>', unsafe_allow_html=True)
+with cols_val5[2]:
+    start_date = st.date_input(
+        "起始日期", 
+        value=st.session_state["start_date"], 
+        max_value=st.session_state["end_date"], 
+        key="start_date_input", 
+        label_visibility="collapsed"
+    )
+    st.session_state["start_date"] = start_date
+
+with cols_val5[3]:
+    st.markdown('<div class="inline-sub-label">結束</div>', unsafe_allow_html=True)
+with cols_val5[4]:
+    end_date = st.date_input(
+        "結束日期", 
+        value=st.session_state["end_date"], 
+        min_value=st.session_state["start_date"], 
+        max_value=today, 
+        key="end_date_input", 
+        label_visibility="collapsed"
+    )
+    st.session_state["end_date"] = end_date
+
+# 依檢驗日期篩選資料
+filtered_df = final_df.copy()
+if len(filtered_df) > 0 and "檢驗日期" in final_df.columns:
+    try:
+        parsed_dates = pd.to_datetime(filtered_df["檢驗日期"], errors='coerce')
+        date_mask = (parsed_dates.dt.date >= start_date) & (parsed_dates.dt.date <= end_date)
+        if parsed_dates.notna().any():
+            filtered_df = filtered_df[date_mask | parsed_dates.isna()]
+    except Exception:
+        pass
+
+st.markdown("<hr style='margin: 12px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
+
+# ==================== 數據小數點位數讀取與圖表渲染 ====================
+if len(filtered_df) > 0 and "測定值" in filtered_df.columns:
+    clean_data = filtered_df.dropna(subset=["測定值"]).copy()
+    
+    decimal_places = 2
+    has_custom_dec = False
+    
+    if "小數位數" in clean_data.columns:
+        valid_dec_series = clean_data["小數位數"].dropna()
+        if not valid_dec_series.empty:
+            try:
+                dec_val = int(float(valid_dec_series.iloc[0]))
+                decimal_places = max(0, dec_val)
+                has_custom_dec = True
+            except ValueError:
+                pass
+                
+    if not has_custom_dec:
+        if "測定值_str" in clean_data.columns:
+            max_dec = 0
+            has_decimal = False
+            for val_str in clean_data["測定值_str"].dropna():
+                if '.' in val_str:
+                    has_decimal = True
+                    dec_part = val_str.split('.')[1]
+                    dec_clean = "".join([c for c in dec_part if c.isdigit()])
+                    max_dec = max(max_dec, len(dec_clean))
+            if has_decimal:
+                decimal_places = max_dec
+            else:
+                decimal_places = 0
+    
+    fmt_str = f"{{:.{decimal_places}f}}"
+    plotly_fmt = f".{decimal_places}f"
+
+    active_batch_col = None
+    for candidate in ["批號", "批次", "檢驗批號"]:
+        if candidate in clean_data.columns and clean_data[candidate].dropna().astype(str).str.strip().ne("").any():
+            active_batch_col = candidate
+            break
+
+    if active_batch_col is not None:
+        clean_data["_x_val"] = clean_data[active_batch_col].astype(str).str.strip()
+        clean_data = clean_data.sort_values(by=active_batch_col, ascending=True).reset_index(drop=True)
+        x_labels = clean_data["_x_val"]
+        xaxis_title_text = active_batch_col
+    else:
+        if "檢驗日期" in clean_data.columns:
+            clean_data["_dt"] = pd.to_datetime(clean_data["檢驗日期"], errors='coerce')
+            clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
+            x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d').fillna(clean_data.index.to_series().astype(str))
+        else:
+            x_labels = clean_data.index.astype(str)
+        xaxis_title_text = "日期"
+else:
+    clean_data = pd.DataFrame()
+    decimal_places = 2
+    fmt_str = "{:.2f}"
+    plotly_fmt = ".2f"
+    x_labels = []
+    xaxis_title_text = "日期"
+
+if len(clean_data) > 0:
+    values = clean_data["測定值"]
+    mean_val = values.mean()
+    std_val = values.std(ddof=1) if len(values) > 1 else 0.0
+    n = len(values)
+
+    usl = float(clean_data["USL"].dropna().iloc[0]) if "USL" in clean_data.columns and len(clean_data["USL"].dropna()) > 0 else None
+    lsl = float(clean_data["LSL"].dropna().iloc[0]) if "LSL" in clean_data.columns and len(clean_data["LSL"].dropna()) > 0 else None
+    ucl = float(clean_data["UCL"].dropna().iloc[0]) if "UCL" in clean_data.columns and len(clean_data["UCL"].dropna()) > 0 else None
+    lcl = float(clean_data["LCL"].dropna().iloc[0]) if "LCL" in clean_data.columns and len(clean_data["LCL"].dropna()) > 0 else None
+
+    cpu = (usl - mean_val) / (3 * std_val) if usl is not None and std_val > 0 else 0
+    cpl = (mean_val - lsl) / (3 * std_val) if lsl is not None and std_val > 0 else 0
+    
+    if usl is not None and lsl is not None:
+        cpk = min(cpu, cpl)
+    elif usl is not None:
+        cpk = cpu
+    elif lsl is not None:
+        cpk = cpl
+    else:
+        cpk = 0.0
+
+    def check_anomaly(val):
+        spec_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
+        control_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
+        
+        if spec_violate:
+            return "超出規格範圍"
+        elif control_violate:
+            return "超出管制範圍"
+        return "正常"
+
+    clean_data["異常狀況"] = values.apply(check_anomaly)
+    
+    marker_colors = []
+    marker_symbols = []
+    marker_sizes = []
+    
+    for status in clean_data["異常狀況"]:
+        if status == "超出規格範圍":
+            marker_colors.append('#dc2626')
+            marker_symbols.append('x')
+            marker_sizes.append(10)
+        elif status == "超出管制範圍":
+            marker_colors.append('#f97316')
+            marker_symbols.append('circle')
+            marker_sizes.append(8)
+        else:
+            marker_colors.append('#2563eb')
+            marker_symbols.append('circle')
+            marker_sizes.append(6)
+
+    date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
+
+    # 1. 統計摘要標題
+    spec_display_part = f" ➔ <span style='color: #dc2626;'>{selected_spec}</span>" if selected_spec else ""
+    summary_title_html = f"""
+    <div class="highlight-title-box">
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
+    </div>
+    """
+    st.markdown(summary_title_html, unsafe_allow_html=True)
+    st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
+    
+    def render_custom_metric(label, value, bg_color, border_color, label_color):
+        st.markdown(f"""
+            <div style="
+                background-color: {bg_color};
+                border: 1.5px solid {border_color};
+                padding: 4px 8px;
+                border-radius: 6px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                height: 52px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            ">
+                <div style="color: {label_color}; font-size: 10px; font-weight: 600; line-height: 1.2;">{label}</div>
+                <div style="color: #000000; font-size: 14px; font-weight: 700; line-height: 1.3;">{value}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    m1, m2, m3, m4, m5, m6, m7, m8 = st.columns(8)
+    with m1:
+        render_custom_metric("有效樣本數 (n)", f"{n:,}", "#ffffff", "#cbd5e1", "#000000")
+    with m2:
+        render_custom_metric("平均值 (Mean)", fmt_str.format(mean_val), "#f0fdf4", "#10b981", "#047857")
+    with m3:
+        render_custom_metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places), "#ffffff", "#cbd5e1", "#000000")
+    with m4:
+        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000")
+    with m5:
+        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c")
+    with m6:
+        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c")
+    with m7:
+        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c")
+    with m8:
+        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c")
+    
+    st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
+
+    # 2. 管制圖標題
+    chart_title_html = f"""
+    <div class="highlight-title-box">
+        <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
+    </div>
+    """
+    st.markdown(chart_title_html, unsafe_allow_html=True)
+
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=x_labels, y=values,
+        mode='lines+markers',
+        name=selected_param,
+        line=dict(color='#2563eb', width=2),
+        marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols)
+    ))
+    
+    fig.add_hline(
+        y=mean_val, line_dash="solid", line_color="#10b981", 
+        annotation_text=f"CL: {fmt_str.format(mean_val)}", 
+        annotation_font_color="#10b981",
+        annotation_position="bottom right"
+    )
+    
+    if ucl is not None:
+        fig.add_hline(
+            y=ucl, line_dash="dot", line_color="#f97316", 
+            annotation_text=f"UCL: {fmt_str.format(ucl)}", 
+            annotation_font_color="#f97316",
+            annotation_position="top left"
+        )
+    
+    if lcl is not None:
+        fig.add_hline(
+            y=lcl, line_dash="dot", line_color="#f97316", 
+            annotation_text=f"LCL: {fmt_str.format(lcl)}", 
+            annotation_font_color="#f97316",
+            annotation_position="bottom left"
+        )
+        
+    if usl is not None:
+        fig.add_hline(
+            y=usl, line_dash="dash", line_color="#ef4444", 
+            annotation_text=f"USL: {fmt_str.format(usl)}", 
+            annotation_font_color="#ef4444",
+            annotation_position="top right"
+        )
+        
+    if lsl is not None:
+        fig.add_hline(
+            y=lsl, line_dash="dash", line_color="#ef4444", 
+            annotation_text=f"LSL: {fmt_str.format(lsl)}", 
+            annotation_font_color="#ef4444",
+            annotation_position="bottom right"
+        )
+
+    fig.update_layout(
+        title=dict(text="", font=dict(color="#000000", size=1)),
+        xaxis_title=dict(text=xaxis_title_text, font=dict(color="#000000", size=12)),
+        yaxis_title=dict(text=selected_param, font=dict(color="#000000", size=12)),
+        plot_bgcolor="#ffffff",
+        paper_bgcolor="#ffffff",
+        font=dict(color="#000000", family="sans-serif"),
+        hovermode="x unified",
+        margin=dict(l=60, r=40, t=10, b=50),
+        xaxis=dict(
+            type='category',
+            tickfont=dict(color="#000000"),
+            title_font=dict(color="#000000"),
+            tickangle=-45,
+            nticks=30,
+            showline=True,
+            linewidth=1,
+            linecolor='black',
+            mirror=True,
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikethickness=1,
+            spikecolor="black",
+            spikedash="dash"
+        ),
+        yaxis=dict(
+            tickfont=dict(color="#000000"),
+            title_font=dict(color="#000000"),
+            title=dict(text=selected_param, font=dict(color="#000000", size=12)),
+            tickformat=plotly_fmt,
+            showline=True,
+            linewidth=1,
+            linecolor='black',
+            mirror=True,
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikethickness=1,
+            spikecolor="black",
+            spikedash="dash"
+        )
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    abnormal_df = clean_data[clean_data["異常狀況"] != "正常"].copy()
+    
+    if len(abnormal_df) > 0:
+        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 (共 {len(abnormal_df)} 筆違規點)</div>', unsafe_allow_html=True)
+        
+        col_name_mapping = {
+            "異常狀況": "異常狀況",
+            active_batch_col: active_batch_col,
+            "檢驗日期": "檢驗日期",
+            "測定值": "測定值",
+            "USL": "規格上限 (USL)",
+            "LSL": "規格下限 (LSL)",
+            "UCL": "管制上限 (UCL)",
+            "LCL": "管制下限 (LCL)"
+        }
+        
+        display_cols = [c for c in ["異常狀況", active_batch_col, "檢驗日期", "測定值", "USL", "LSL", "UCL", "LCL"] if c in abnormal_df.columns or c == "異常狀況"]
+        
+        table_html = '<table class="custom-alert-table"><thead><tr>'
+        for col in display_cols:
+            header_label = col_name_mapping.get(col, col)
+            table_html += f'<th>{header_label}</th>'
+        table_html += '</tr></thead><tbody>'
+        
+        for _, row in abnormal_df[display_cols].iterrows():
+            table_html += '<tr>'
+            for col in display_cols:
+                val = row[col]
+                if pd.isna(val):
+                    val_str = ""
+                elif col == "異常狀況":
+                    if "規格" in str(val):
+                        val_str = "❌ 超出規格範圍"
+                    else:
+                        val_str = "⚠️ 超出管制範圍"
+                elif isinstance(val, float):
+                    val_str = f"{val:.{decimal_places}f}"
+                else:
+                    val_str = str(val)
+                table_html += f'<td>{val_str}</td>'
+            table_html += '</tr>'
+        table_html += '</tbody></table>'
+        
+        st.markdown(table_html, unsafe_allow_html=True)
+    else:
+        st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
+
+    with st.expander("點此查看該項目的完整歷史數據明細"):
+        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True)
+        
+else:
+    st.warning("該篩選條件下沒有對應的數據。")
