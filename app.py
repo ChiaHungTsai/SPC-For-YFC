@@ -376,7 +376,7 @@ for stage_label, raw_name in stages_dict.items():
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱與取樣點/規格選單 (動態判斷是否顯示「全部」) ====================
+# ==================== 3. 樣品名稱與取樣點/規格選單 ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -400,7 +400,6 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-# 【智慧判斷】：只有當取樣點/規格大於 1 個時，才加上「全部」選項；若只有 1 個或沒有，則維持原樣
 if len(raw_specs_list) > 1:
     specs_list = ["全部"] + raw_specs_list
 else:
@@ -794,6 +793,11 @@ if len(clean_data) > 0:
         font=dict(color="#000000", family="sans-serif"),
         hovermode="x unified",
         margin=dict(l=60, r=40, t=10, b=50),
+        # 【關鍵修正】：將圖例垂直置中於 y=0.5
+        legend=dict(
+            y=0.5,
+            yanchor="middle"
+        ),
         xaxis=dict(
             type='category',
             categoryorder='array',
