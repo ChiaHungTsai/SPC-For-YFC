@@ -376,7 +376,7 @@ for stage_label, raw_name in stages_dict.items():
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱與取樣點/規格選單 (左右欄位權重設為相等) ====================
+# ==================== 3. 樣品名稱與取樣點/規格選單 ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -398,7 +398,9 @@ with cols_row3[1]:
 
 prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_list and selected_product != "請先選擇製程階段" else pd.DataFrame()
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
-specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
+raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
+
+specs_list = ["全部"] + raw_specs_list if raw_specs_list else []
 
 with cols_row3[3]:
     st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
@@ -415,7 +417,10 @@ with cols_row3[4]:
             on_change=on_spec_change,
             label_visibility="collapsed"
         )
-        spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == selected_spec]
+        if selected_spec == "全部":
+            spec_df = prod_df
+        else:
+            spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == selected_spec]
     else:
         selected_spec = None
         st.selectbox(
@@ -450,7 +455,7 @@ with cols_param[1]:
         label_visibility="collapsed"
     )
 
-final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list and selected_param != "請先選擇樣品名稱" else pd.DataFrame()
+final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list and selected_param != "請先選擇製程階段" else pd.DataFrame()
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # ==================== 5. 檢驗日期區間選擇 ====================
@@ -559,25 +564,37 @@ if len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
+    if "檢驗日期" in clean_data.columns:
+        clean_data["_dt"] = pd.to_datetime(clean_data["檢驗日期"], errors='coerce')
+    
     if active_batch_col is not None:
         clean_data["_x_val"] = clean_data[active_batch_col].astype(str).str.strip()
-        clean_data = clean_data.sort_values(by=active_batch_col, ascending=True).reset_index(drop=True)
-        x_labels = clean_data["_x_val"]
-        xaxis_title_text = active_batch_col
+
+    if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
+        sort_cols = ["_dt"] + ([active_batch_col] if active_batch_col is not None else [])
+        clean_data = clean_data.sort_values(by=sort_cols, ascending=True).reset_index(drop=True)
+        
+        unique_sorted_dates = clean_data["_dt"].dropna().dt.strftime('%Y-%m-%d').unique().tolist()
+        unique_sorted_dates.sort()
+        
+        x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d').fillna(clean_data.index.to_series().astype(str))
+        xaxis_title_text = "日期"
     else:
-        if "檢驗日期" in clean_data.columns:
-            clean_data["_dt"] = pd.to_datetime(clean_data["檢驗日期"], errors='coerce')
-            clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
-            x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d').fillna(clean_data.index.to_series().astype(str))
+        unique_sorted_dates = []
+        if active_batch_col is not None:
+            clean_data = clean_data.sort_values(by=active_batch_col, ascending=True).reset_index(drop=True)
+            x_labels = clean_data["_x_val"]
+            xaxis_title_text = active_batch_col
         else:
             x_labels = clean_data.index.astype(str)
-        xaxis_title_text = "日期"
+            xaxis_title_text = "日期"
 else:
     clean_data = pd.DataFrame()
     decimal_places = 2
     fmt_str = "{:.2f}"
     plotly_fmt = ".2f"
     x_labels = []
+    unique_sorted_dates = []
     xaxis_title_text = "日期"
 
 if len(clean_data) > 0:
@@ -645,9 +662,10 @@ if len(clean_data) > 0:
     st.markdown(summary_title_html, unsafe_allow_html=True)
     st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
     
-    def render_custom_metric(label, value, bg_color, border_color, label_color):
+    # 定義自訂精美指標方塊函式
+    def render_custom_metric(label, value, bg_color, border_color, label_color, unique_key):
         st.markdown(f"""
-            <div style="
+            <div key="{unique_key}" style="
                 background-color: {bg_color};
                 border: 1.5px solid {border_color};
                 padding: 4px 8px;
@@ -663,23 +681,24 @@ if len(clean_data) > 0:
             </div>
         """, unsafe_allow_html=True)
 
+    # 【已恢復】：採用橫向 8 欄的精美自訂樣式指標卡片
     m1, m2, m3, m4, m5, m6, m7, m8 = st.columns(8)
     with m1:
-        render_custom_metric("有效樣本數 (n)", f"{n:,}", "#ffffff", "#cbd5e1", "#000000")
+        render_custom_metric("有效樣本數 (n)", f"{n:,}", "#ffffff", "#cbd5e1", "#000000", "m1")
     with m2:
-        render_custom_metric("平均值 (Mean)", fmt_str.format(mean_val), "#f0fdf4", "#10b981", "#047857")
+        render_custom_metric("平均值 (Mean)", fmt_str.format(mean_val), "#f0fdf4", "#10b981", "#047857", "m2")
     with m3:
-        render_custom_metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places), "#ffffff", "#cbd5e1", "#000000")
+        render_custom_metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places), "#ffffff", "#cbd5e1", "#000000", "m3")
     with m4:
-        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000")
+        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
     with m5:
-        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c")
+        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m5")
     with m6:
-        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c")
+        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m6")
     with m7:
-        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c")
+        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m7")
     with m8:
-        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c")
+        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m8")
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
@@ -693,20 +712,44 @@ if len(clean_data) > 0:
 
     fig = go.Figure()
     
-    fig.add_trace(go.Scatter(
-        x=x_labels, y=values,
-        mode='lines+markers',
-        name=selected_param,
-        line=dict(color='#2563eb', width=2),
-        marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols)
-    ))
-    
-    fig.add_hline(
-        y=mean_val, line_dash="solid", line_color="#10b981", 
-        annotation_text=f"CL: {fmt_str.format(mean_val)}", 
-        annotation_font_color="#10b981",
-        annotation_position="bottom right"
-    )
+    # 如果選擇「全部」，則依不同的取樣點/規格分開畫出多條折線
+    if selected_spec == "全部" and "取樣點/規格" in clean_data.columns:
+        sub_specs = clean_data["取樣點/規格"].dropna().unique()
+        color_palette = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+        
+        for idx, sub_spec in enumerate(sub_specs):
+            sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].sort_values(by="_dt")
+            sub_color = color_palette[idx % len(color_palette)]
+            
+            if "_dt" in sub_df.columns:
+                sub_x = sub_df["_dt"].dt.strftime('%Y-%m-%d')
+            elif active_batch_col is not None and "_x_val" in sub_df.columns:
+                sub_x = sub_df["_x_val"]
+            else:
+                sub_x = sub_df.index.astype(str)
+                
+            fig.add_trace(go.Scatter(
+                x=sub_x, y=sub_df["測定值"],
+                mode='lines+markers',
+                name=f"{sub_spec}",
+                line=dict(color=sub_color, width=2),
+                marker=dict(size=6)
+            ))
+    else:
+        fig.add_trace(go.Scatter(
+            x=x_labels, y=values,
+            mode='lines+markers',
+            name=selected_param,
+            line=dict(color='#2563eb', width=2),
+            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols)
+        ))
+        
+        fig.add_hline(
+            y=mean_val, line_dash="solid", line_color="#10b981", 
+            annotation_text=f"CL: {fmt_str.format(mean_val)}", 
+            annotation_font_color="#10b981",
+            annotation_position="bottom right"
+        )
     
     if ucl is not None:
         fig.add_hline(
@@ -751,6 +794,8 @@ if len(clean_data) > 0:
         margin=dict(l=60, r=40, t=10, b=50),
         xaxis=dict(
             type='category',
+            categoryorder='array',
+            categoryarray=unique_sorted_dates,
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
@@ -783,7 +828,7 @@ if len(clean_data) > 0:
             spikedash="dash"
         )
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, key="spc_main_chart")
 
     abnormal_df = clean_data[clean_data["異常狀況"] != "正常"].copy()
     
@@ -836,7 +881,7 @@ if len(clean_data) > 0:
         st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
 
     with st.expander("點此查看該項目的完整歷史數據明細"):
-        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True)
+        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
         
 else:
     st.warning("該篩選條件下沒有對應的數據。")
