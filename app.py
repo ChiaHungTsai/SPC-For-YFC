@@ -376,7 +376,7 @@ for stage_label, raw_name in stages_dict.items():
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱與取樣點/規格選單 ====================
+# ==================== 3. 樣品名稱與取樣點/規格選單 (動態判斷是否顯示「全部」) ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -400,7 +400,11 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-specs_list = ["全部"] + raw_specs_list if raw_specs_list else []
+# 【智慧判斷】：只有當取樣點/規格大於 1 個時，才加上「全部」選項；若只有 1 個或沒有，則維持原樣
+if len(raw_specs_list) > 1:
+    specs_list = ["全部"] + raw_specs_list
+else:
+    specs_list = raw_specs_list
 
 with cols_row3[3]:
     st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
@@ -662,7 +666,6 @@ if len(clean_data) > 0:
     st.markdown(summary_title_html, unsafe_allow_html=True)
     st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
     
-    # 定義自訂精美指標方塊函式
     def render_custom_metric(label, value, bg_color, border_color, label_color, unique_key):
         st.markdown(f"""
             <div key="{unique_key}" style="
@@ -681,7 +684,6 @@ if len(clean_data) > 0:
             </div>
         """, unsafe_allow_html=True)
 
-    # 【已恢復】：採用橫向 8 欄的精美自訂樣式指標卡片
     m1, m2, m3, m4, m5, m6, m7, m8 = st.columns(8)
     with m1:
         render_custom_metric("有效樣本數 (n)", f"{n:,}", "#ffffff", "#cbd5e1", "#000000", "m1")
