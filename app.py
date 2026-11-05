@@ -261,7 +261,6 @@ def on_product_change():
     st.session_state.pop("current_param", None)
 
 def on_spec_change():
-    # 【已修改】：切換取樣點/規格時，不再強制清空分析項目，讓它盡量保持固定
     pass
 
 # ==================== 頂部主標題與「更新資料」按鈕同行配置 ====================
@@ -462,22 +461,21 @@ with cols_param[1]:
 final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list and selected_param != "請先選擇製程階段" else pd.DataFrame()
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇 ====================
+# ==================== 5. 檢驗日期區間選擇 (動態預設上下半年邏輯) ====================
 today = date.today()
 current_year = today.year
-if today < date(current_year, 4, 1):
-    default_start_year = current_year - 1
-else:
-    default_start_year = current_year
 
-default_start = date(default_start_year, 1, 1)
+# 判斷當天是當年的上半年 (1月~6月) 還是下半年 (7月~12月)
+if today.month <= 6:
+    # 上半年預設：前年度 1/1
+    default_start = date(current_year - 1, 1, 1)
+else:
+    # 下半年預設：當年度 1/1
+    default_start = date(current_year, 1, 1)
+
 default_end = today
 
-if len(final_df) > 0 and "檢驗日期" in final_df.columns:
-    valid_dates = pd.to_datetime(final_df["檢驗日期"], errors='coerce').dt.date.dropna()
-    if not valid_dates.empty:
-        default_start = valid_dates.min()
-
+# 如果 session_state 裡面還沒有記錄日期，才賦予動態預設值；一旦使用者調整過就予以保留固定
 if "start_date" not in st.session_state:
     st.session_state["start_date"] = default_start
 if "end_date" not in st.session_state:
