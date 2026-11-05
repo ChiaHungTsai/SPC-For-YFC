@@ -400,6 +400,13 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
+# 【關鍵修正】：對取樣點/規格進行穩定排序（支援數字自然排序與字串排序），確保選單項目每次載入都按固定順序排列
+def natural_sort_key(s):
+    import re
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
+
+raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
+
 if len(raw_specs_list) > 1:
     if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
         st.session_state["current_spec"] = []
@@ -846,8 +853,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         legend=dict(
             y=0.5,
             yanchor="middle",
-            bordercolor="#000000",  # 設定圖例外框顏色為黑色
-            borderwidth=1          # 設定圖例外框寬度
+            bordercolor="#000000",
+            borderwidth=1
         ),
         xaxis=dict(
             type='category',
