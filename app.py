@@ -743,11 +743,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 【解決方案】：
-    # 1. 對於每個取樣點，我們嚴格只抓取「該取樣點本身有實際檢驗數據」的日期與數值。
-    # 2. 這樣當某個取樣點在當天沒有檢驗時，該取樣點在圖表上完全沒有該日期的點，x unified 提示框自然不會抓到錯誤或舊的數值。
-    # 3. 透過設定 hoverlabel 與 yaxis 座標，將懸停提示框的位置固定在圖表頂端，避免遮擋中間的圖形。
-    
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -765,19 +760,20 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         for idx, sub_spec in enumerate(selected_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
             sub_df = sub_df.dropna(subset=["測定值"])
-            if "_dt" in sub_df.columns:
-                sub_df = sub_df.sort_values(by="_dt")
-            if len(sub_df) == 0:
-                continue
-            sub_color = color_palette[idx % len(color_palette)]
-            
             if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
+                sub_df = sub_df.sort_values(by="_dt")
                 sub_x = sub_df["_dt"].dt.strftime('%Y-%m-%d')
             elif active_batch_col is not None and active_batch_col in sub_df.columns:
+                sub_df = sub_df.sort_values(by=active_batch_col)
                 sub_x = sub_df[active_batch_col].astype(str).str.strip()
             else:
                 sub_x = sub_df.index.astype(str)
                 
+            if len(sub_df) == 0:
+                continue
+                
+            sub_color = color_palette[idx % len(color_palette)]
+            
             fig.add_trace(go.Scatter(
                 x=sub_x, y=sub_df["測定值"],
                 mode='lines+markers',
@@ -844,10 +840,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         font=dict(color="#000000", family="sans-serif"),
         hovermode="x unified",
         hoverlabel=dict(
-            align="left",
-            yanchor="top"  # 將提示框向上對齊，避免擋住中間圖形
+            align="left"
         ),
-        margin=dict(l=60, r=40, t=30, b=50),  # 稍微增加上方邊距 (t=30)，讓置頂的提示框有足夠空間顯示
+        margin=dict(l=60, r=40, t=50, b=50),
         legend=dict(
             y=0.5,
             yanchor="middle"
