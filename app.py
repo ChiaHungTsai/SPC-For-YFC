@@ -261,7 +261,8 @@ def on_product_change():
     st.session_state.pop("current_param", None)
 
 def on_spec_change():
-    st.session_state.pop("current_param", None)
+    # 【已修改】：切換取樣點/規格時，不再強制清空分析項目，讓它盡量保持固定
+    pass
 
 # ==================== 頂部主標題與「更新資料」按鈕同行配置 ====================
 header_cols = st.columns([5.5, 1.2])
@@ -793,7 +794,6 @@ if len(clean_data) > 0:
         font=dict(color="#000000", family="sans-serif"),
         hovermode="x unified",
         margin=dict(l=60, r=40, t=10, b=50),
-        # 【關鍵修正】：將圖例垂直置中於 y=0.5
         legend=dict(
             y=0.5,
             yanchor="middle"
