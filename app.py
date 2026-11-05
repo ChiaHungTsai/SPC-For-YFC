@@ -382,7 +382,6 @@ products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-# 重新分配這一行的欄位比例：[標籤, 樣品名稱選單, 空白間距, 標籤, 取樣點選單, 全選按鈕, 右側留白]
 row_weights = [0.7, 2.8, 0.45, 0.8, 2.1, 0.7, 1.4]
 cols_row3 = st.columns(row_weights)
 
@@ -401,10 +400,22 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-# 【修正處】：在宣告 multiselect 之前，先透過按鈕修改 session_state，避免 Widget 已經 Instantiate 後被強行覆寫
+# 先確保 current_spec 狀態正確初始化
+if len(raw_specs_list) > 0:
+    if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
+        st.session_state["current_spec"] = raw_specs_list.copy()
+    else:
+        st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
+        if not st.session_state["current_spec"]:
+            st.session_state["current_spec"] = raw_specs_list.copy()
+
+# 判斷是否已經「全選」所有規格
+is_all_selected = len(raw_specs_list) > 0 and set(st.session_state.get("current_spec", [])) == set(raw_specs_list)
+
+# 「全選」按鈕（若已全選則設為 disabled=True，會自動套用灰色斜線樣式）
 with cols_row3[5]:
     if len(raw_specs_list) > 0:
-        if st.button("全選規格", use_container_width=True):
+        if st.button("全選", use_container_width=True, disabled=is_all_selected):
             st.session_state["current_spec"] = raw_specs_list.copy()
             st.rerun()
 
@@ -413,13 +424,6 @@ with cols_row3[3]:
 
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
-        if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
-            st.session_state["current_spec"] = raw_specs_list.copy()
-        else:
-            st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
-            if not st.session_state["current_spec"]:
-                st.session_state["current_spec"] = raw_specs_list.copy()
-
         selected_specs = st.multiselect(
             "取樣點/規格",
             options=raw_specs_list,
