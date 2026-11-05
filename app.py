@@ -8,7 +8,7 @@ from datetime import date
 # 1. 網頁基本設定 (寬螢幕、隱藏側邊欄)
 st.set_page_config(page_title="義芳化學品保科 - SPC 統計製程管制儀表板", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 自訂 CSS (包含強制讓 multiselect 下拉選單顯示核取方框與支援捲動)
+# 2. 自訂 CSS
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {display: none;}
@@ -449,7 +449,6 @@ with cols_row3[4]:
             label_visibility="collapsed"
         )
         
-        # 【關鍵修復】：根據原本固定的 raw_specs_list 順序對勾選的項目進行重新排序，確保圖表與資料排序永遠固定，不會因點選順序而亂跳
         selected_specs = [s for s in raw_specs_list if s in selected_specs]
         
         if len(selected_specs) > 0:
@@ -478,6 +477,7 @@ with cols_param[0]:
 with cols_param[1]:
     if len(raw_specs_list) == 0 or len(selected_specs) > 0:
         params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
+        # 【分析項目排序】：讓分析項目清單也進行有序並固定排列
         params_list = sorted(params_list, key=natural_sort_key)
 
         if "current_param" not in st.session_state or st.session_state["current_param"] not in params_list:
