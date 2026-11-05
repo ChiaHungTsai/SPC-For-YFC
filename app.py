@@ -373,7 +373,7 @@ for stage_label, raw_name in stages_dict.items():
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱選單 (維持下拉) ====================
+# ==================== 3. 樣品名稱選單 ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -408,21 +408,25 @@ if "selected_spec_btn" not in st.session_state or st.session_state["selected_spe
 
 selected_spec_mode = st.session_state["selected_spec_btn"]
 
+# 樣品名稱與按鈕群組的排版列 (權重設計與製造單位按鈕群組一致)
 with cols_row3[3]:
     st.markdown('<div class="row-label">欲顯示的取樣點/規格</div>', unsafe_allow_html=True)
 
-# 動態渲染取樣點/規格的按鈕群組 (最多支援橫向排列，若超過數量會自動換行或延展)
-spec_btn_cols = st.columns([1.0] * len(spec_options) + [max(0.1, 7.0 - len(spec_options))]) if spec_options else [st.container()]
+# 為了讓取樣點按鈕群組像製造單位一樣整齊並自動延展，我們使用彈性欄位分配
+# 假設取樣點選項數量較多時，採用動態寬度比例分配
+num_opts = len(spec_options) if spec_options else 1
+spec_col_weights = [1.2] * num_opts + [max(0.1, 7.5 - num_opts * 1.2)]
+cols_spec_btns = st.columns(spec_col_weights)
 
 for idx, opt in enumerate(spec_options):
-    with spec_btn_cols[idx]:
+    with cols_spec_btns[idx]:
         is_active = (selected_spec_mode == opt)
         if st.button(opt, key=f"spec_btn_{opt}", use_container_width=True, type="primary" if is_active else "secondary"):
             if st.session_state["selected_spec_btn"] != opt:
                 st.session_state["selected_spec_btn"] = opt
                 st.rerun()
 
-# 根據按鈕選擇決定資料範圍
+# 根據按鈕選擇決定資料範圍與顯示名稱
 selected_sub_specs = []
 if selected_spec_mode == "多選" and len(raw_specs_list) > 1:
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
