@@ -248,20 +248,17 @@ for rc in required_cols:
 def on_unit_change():
     st.session_state.pop("selected_stage", None)
     st.session_state.pop("current_product", None)
-    st.session_state.pop("current_spec", None)
+    st.session_state.pop("selected_spec_btn", None)
     st.session_state.pop("current_param", None)
 
 def on_stage_change():
     st.session_state.pop("current_product", None)
-    st.session_state.pop("current_spec", None)
+    st.session_state.pop("selected_spec_btn", None)
     st.session_state.pop("current_param", None)
 
 def on_product_change():
-    st.session_state.pop("current_spec", None)
+    st.session_state.pop("selected_spec_btn", None)
     st.session_state.pop("current_param", None)
-
-def on_spec_change():
-    pass
 
 # ==================== 頂部主標題與「更新資料」按鈕同行配置 ====================
 header_cols = st.columns([5.5, 1.2])
@@ -376,7 +373,7 @@ for stage_label, raw_name in stages_dict.items():
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱與取樣點/規格選單 (支援「全部」與自訂多選) ====================
+# ==================== 3. 樣品名稱選單 (維持下拉) ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -400,46 +397,34 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
+# 如果有多個取樣點，加上「多選」按鈕選項；若只有一個則直接顯示該項目
 if len(raw_specs_list) > 1:
-    specs_list = ["全部"] + raw_specs_list
+    spec_options = ["多選"] + raw_specs_list
 else:
-    specs_list = raw_specs_list
+    spec_options = raw_specs_list
+
+if "selected_spec_btn" not in st.session_state or st.session_state["selected_spec_btn"] not in spec_options:
+    st.session_state["selected_spec_btn"] = spec_options[0] if spec_options else ""
+
+selected_spec_mode = st.session_state["selected_spec_btn"]
 
 with cols_row3[3]:
-    st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
+    st.markdown('<div class="row-label">欲顯示的取樣點/規格</div>', unsafe_allow_html=True)
 
-selected_sub_specs = [] # 用來裝多選時想看的特定取樣點
+# 動態渲染取樣點/規格的按鈕群組 (最多支援橫向排列，若超過數量會自動換行或延展)
+spec_btn_cols = st.columns([1.0] * len(spec_options) + [max(0.1, 7.0 - len(spec_options))]) if spec_options else [st.container()]
 
-with cols_row3[4]:
-    if len(specs_list) > 0:
-        if "current_spec" not in st.session_state or st.session_state["current_spec"] not in specs_list:
-            st.session_state["current_spec"] = specs_list[0]
-            
-        selected_spec = st.selectbox(
-            "取樣點/規格",
-            specs_list,
-            key="current_spec",
-            on_change=on_spec_change,
-            label_visibility="collapsed"
-        )
-        
-        if selected_spec == "全部":
-            spec_df = prod_df
-        else:
-            spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == selected_spec]
-    else:
-        selected_spec = None
-        st.selectbox(
-            "取樣點/規格",
-            ["無取樣點/規格資料"],
-            disabled=True,
-            key="sel_spec_disabled",
-            label_visibility="collapsed"
-        )
-        spec_df = prod_df
+for idx, opt in enumerate(spec_options):
+    with spec_btn_cols[idx]:
+        is_active = (selected_spec_mode == opt)
+        if st.button(opt, key=f"spec_btn_{opt}", use_container_width=True, type="primary" if is_active else "secondary"):
+            if st.session_state["selected_spec_btn"] != opt:
+                st.session_state["selected_spec_btn"] = opt
+                st.rerun()
 
-# 【新增功能】：如果使用者在下拉選單選擇了「全部」，下方自動展開一個多選框讓使用者勾選特定想看的取樣點
-if selected_spec == "全部" and len(raw_specs_list) > 1:
+# 根據按鈕選擇決定資料範圍
+selected_sub_specs = []
+if selected_spec_mode == "多選" and len(raw_specs_list) > 1:
     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
     sub_cols = [0.7, 8.0]
     with st.columns(sub_cols)[0]:
@@ -452,11 +437,18 @@ if selected_spec == "全部" and len(raw_specs_list) > 1:
             label_visibility="collapsed",
             key="multi_spec_filter"
         )
-    # 根據勾選結果過濾資料
     if selected_sub_specs:
         spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_sub_specs)]
+        selected_spec_display = "多選"
     else:
-        spec_df = pd.DataFrame(columns=prod_df.columns) # 沒勾選就清空
+        spec_df = pd.DataFrame(columns=prod_df.columns)
+        selected_spec_display = "多選 (未勾選)"
+elif selected_spec_mode in raw_specs_list:
+    selected_spec_display = selected_spec_mode
+    spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == selected_spec_mode]
+else:
+    selected_spec_display = None
+    spec_df = prod_df
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -674,7 +666,7 @@ if len(clean_data) > 0:
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
     # 1. 統計摘要標題
-    spec_display_part = f" ➔ <span style='color: #dc2626;'>{selected_spec}</span>" if selected_spec else ""
+    spec_display_part = f" ➔ <span style='color: #dc2626;'>{selected_spec_display}</span>" if selected_spec_display else ""
     summary_title_html = f"""
     <div class="highlight-title-box">
         {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
@@ -731,8 +723,8 @@ if len(clean_data) > 0:
 
     fig = go.Figure()
     
-    # 如果選擇「全部」，則依勾選的取樣點/規格分開畫出多條折線
-    if selected_spec == "全部" and "取樣點/規格" in clean_data.columns:
+    # 如果選擇「多選」，則依勾選的取樣點/規格分開畫出多條折線
+    if selected_spec_mode == "多選" and "取樣點/規格" in clean_data.columns:
         sub_specs = clean_data["取樣點/規格"].dropna().unique()
         color_palette = [
             '#0f172a',  # 極深黑藍
