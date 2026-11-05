@@ -164,7 +164,7 @@ st.markdown("""
     
     div[data-baseweb="select"] > div {
         min-height: 36px !important;
-        height: 36px !important;
+        height: auto !important;
     }
     
     div[data-baseweb="input"] > div {
@@ -400,35 +400,38 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-if len(raw_specs_list) > 1:
-    specs_list = ["全部"] + raw_specs_list
-else:
-    specs_list = raw_specs_list
-
 with cols_row3[3]:
     st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
 
 with cols_row3[4]:
-    if len(specs_list) > 0:
-        if "current_spec" not in st.session_state or st.session_state["current_spec"] not in specs_list:
-            st.session_state["current_spec"] = specs_list[0]
-            
-        selected_spec = st.selectbox(
+    if len(raw_specs_list) > 0:
+        # 改為多選 (st.multiselect)
+        if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
+            st.session_state["current_spec"] = raw_specs_list.copy() # 預設全選
+        else:
+            # 過濾確保選項依然存在
+            st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
+            if not st.session_state["current_spec"]:
+                st.session_state["current_spec"] = raw_specs_list.copy()
+
+        selected_specs = st.multiselect(
             "取樣點/規格",
-            specs_list,
+            options=raw_specs_list,
             key="current_spec",
             on_change=on_spec_change,
             label_visibility="collapsed"
         )
-        if selected_spec == "全部":
-            spec_df = prod_df
+        
+        if len(selected_specs) > 0:
+            spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_specs)]
         else:
-            spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == selected_spec]
+            spec_df = prod_df.iloc[0:0] # 若未選取任何項目則為空
     else:
-        selected_spec = None
-        st.selectbox(
+        selected_specs = []
+        st.multiselect(
             "取樣點/規格",
-            ["無取樣點/規格資料"],
+            options=["無取樣點/規格資料"],
+            default=["無取樣點/規格資料"],
             disabled=True,
             key="sel_spec_disabled",
             label_visibility="collapsed"
@@ -651,7 +654,8 @@ if len(clean_data) > 0:
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
     # 1. 統計摘要標題
-    spec_display_part = f" ➔ <span style='color: #dc2626;'>{selected_spec}</span>" if selected_spec else ""
+    specs_display_text = ", ".join(selected_specs) if len(selected_specs) <= 3 else f"多選 ({len(selected_specs)}個項目)"
+    spec_display_part = f" ➔ <span style='color: #dc2626;'>{specs_display_text}</span>" if selected_specs else ""
     summary_title_html = f"""
     <div class="highlight-title-box">
         {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
@@ -708,10 +712,8 @@ if len(clean_data) > 0:
 
     fig = go.Figure()
     
-    # 如果選擇「全部」，則依不同的取樣點/規格分開畫出多條折線
-    if selected_spec == "全部" and "取樣點/規格" in clean_data.columns:
-        sub_specs = clean_data["取樣點/規格"].dropna().unique()
-        # 【全新高度辨識色彩配置】：採用色相差距極大的亮色與深色交錯（避開紅、綠、橘）
+    # 若勾選多個取樣點/規格，則依不同的取樣點/規格分開畫出多條折線
+    if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
             '#0d9488',  # 鮮明青綠 (Teal 600)
@@ -725,8 +727,10 @@ if len(clean_data) > 0:
             '#ca8a04'   # 深土黃 (Yellow 600)
         ]
         
-        for idx, sub_spec in enumerate(sub_specs):
-            sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].sort_values(by="_dt")
+        for idx, sub_spec in enumerate(selected_specs):
+            sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].sort_values(by="_dt" if "_dt" in clean_data.columns else clean_data.index)
+            if len(sub_df) == 0:
+                continue
             sub_color = color_palette[idx % len(color_palette)]
             
             if "_dt" in sub_df.columns:
