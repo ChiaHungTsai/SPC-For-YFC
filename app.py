@@ -376,7 +376,7 @@ for stage_label, raw_name in stages_dict.items():
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱與取樣點/規格選單 ====================
+# ==================== 3. 樣品名稱與取樣點/規格選單 (支援「全部」與自訂多選) ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -408,6 +408,8 @@ else:
 with cols_row3[3]:
     st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
 
+selected_sub_specs = [] # 用來裝多選時想看的特定取樣點
+
 with cols_row3[4]:
     if len(specs_list) > 0:
         if "current_spec" not in st.session_state or st.session_state["current_spec"] not in specs_list:
@@ -420,6 +422,7 @@ with cols_row3[4]:
             on_change=on_spec_change,
             label_visibility="collapsed"
         )
+        
         if selected_spec == "全部":
             spec_df = prod_df
         else:
@@ -434,6 +437,26 @@ with cols_row3[4]:
             label_visibility="collapsed"
         )
         spec_df = prod_df
+
+# 【新增功能】：如果使用者在下拉選單選擇了「全部」，下方自動展開一個多選框讓使用者勾選特定想看的取樣點
+if selected_spec == "全部" and len(raw_specs_list) > 1:
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+    sub_cols = [0.7, 8.0]
+    with st.columns(sub_cols)[0]:
+        st.markdown('<div class="inline-sub-label" style="justify-content: flex-start; color: #1e3a8a;">勾選欲顯示項目</div>', unsafe_allow_html=True)
+    with st.columns(sub_cols)[1]:
+        selected_sub_specs = st.multiselect(
+            "勾選欲顯示的取樣點/規格",
+            options=raw_specs_list,
+            default=raw_specs_list,  # 預設全選
+            label_visibility="collapsed",
+            key="multi_spec_filter"
+        )
+    # 根據勾選結果過濾資料
+    if selected_sub_specs:
+        spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_sub_specs)]
+    else:
+        spec_df = pd.DataFrame(columns=prod_df.columns) # 沒勾選就清空
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -708,21 +731,20 @@ if len(clean_data) > 0:
 
     fig = go.Figure()
     
-    # 如果選擇「全部」，則依不同的取樣點/規格分開畫出多條折線
+    # 如果選擇「全部」，則依勾選的取樣點/規格分開畫出多條折線
     if selected_spec == "全部" and "取樣點/規格" in clean_data.columns:
         sub_specs = clean_data["取樣點/規格"].dropna().unique()
-        # 【全新高度辨識色彩配置】：採用色相差距極大的亮色與深色交錯（避開紅、綠、橘）
         color_palette = [
-            '#0f172a',  # 極深黑藍 (Slate 900)
-            '#0d9488',  # 鮮明青綠 (Teal 600)
-            '#d97706',  # 琥珀金黃 (Amber 600)
-            '#db2777',  # 亮桃紅 (Pink 600)
-            '#7c3aed',  # 亮紫色 (Violet 600)
-            '#0284c7',  # 亮天藍 (Sky 600)
-            '#65a30d',  # 青草黃綠 (Lime 600)
-            '#9333ea',  # 寶石紫 (Purple 600)
-            '#4f46e5',  # 靛青色 (Indigo 600)
-            '#ca8a04'   # 深土黃 (Yellow 600)
+            '#0f172a',  # 極深黑藍
+            '#0d9488',  # 鮮明青綠
+            '#d97706',  # 琥珀金黃
+            '#db2777',  # 亮桃紅
+            '#7c3aed',  # 亮紫色
+            '#0284c7',  # 亮天藍
+            '#65a30d',  # 青草黃綠
+            '#9333ea',  # 寶石紫
+            '#4f46e5',  # 靛青色
+            '#ca8a04'   # 深土黃
         ]
         
         for idx, sub_spec in enumerate(sub_specs):
