@@ -743,11 +743,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 【關鍵完美對策】：
-    # 1. 維持 hovermode="x unified" 與整齊的時間對齊。
-    # 2. 在畫圖前，建立一組涵蓋「所有出現過的日期」完整 X 軸基準 (`unique_sorted_dates`)。
-    # 3. 針對每個取樣點，將資料對齊到這個完整日期基準上：如果該天沒有檢驗數據，Y 值直接補為 `None`。
-    # 這樣既能讓所有線條在同一個時間軸上對齊，又能在某個取樣點當天沒資料時讓該點「真正消失」（提示框不會抓到舊日期的舊數值），且線條會自動斷開不亂連。
+    # 【解決方案】：
+    # 1. 對於每個取樣點，我們嚴格只抓取「該取樣點本身有實際檢驗數據」的日期與數值。
+    # 2. 這樣當某個取樣點在當天沒有檢驗時，該取樣點在圖表上完全沒有該日期的點，x unified 提示框自然不會抓到錯誤或舊的數值。
+    # 3. 透過設定 hoverlabel 與 yaxis 座標，將懸停提示框的位置固定在圖表頂端，避免遮擋中間的圖形。
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
@@ -765,27 +764,27 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         
         for idx, sub_spec in enumerate(selected_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
+            sub_df = sub_df.dropna(subset=["測定值"])
+            if "_dt" in sub_df.columns:
+                sub_df = sub_df.sort_values(by="_dt")
+            if len(sub_df) == 0:
+                continue
             sub_color = color_palette[idx % len(color_palette)]
             
             if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
-                sub_df["_date_str"] = sub_df["_dt"].dt.strftime('%Y-%m-%d')
-                # 重新重索引對齊全域的 unique_sorted_dates，沒資料的日期填入 NaN
-                aligned_df = pd.DataFrame({"_date_str": unique_sorted_dates})
-                sub_df_grouped = sub_df.groupby("_date_str")["測定值"].mean().reset_index()
-                merged_sub = pd.merge(aligned_df, sub_df_grouped, on="_date_str", how="left")
-                sub_x = merged_sub["_date_str"]
-                sub_y = merged_sub["測定值"]
+                sub_x = sub_df["_dt"].dt.strftime('%Y-%m-%d')
+            elif active_batch_col is not None and active_batch_col in sub_df.columns:
+                sub_x = sub_df[active_batch_col].astype(str).str.strip()
             else:
                 sub_x = sub_df.index.astype(str)
-                sub_y = sub_df["測定值"]
                 
             fig.add_trace(go.Scatter(
-                x=sub_x, y=sub_y,
+                x=sub_x, y=sub_df["測定值"],
                 mode='lines+markers',
                 name=f"{sub_spec}",
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=7),
-                connectgaps=False  # 確保沒資料時線條斷開，不亂連
+                connectgaps=False
             ))
     else:
         fig.add_trace(go.Scatter(
@@ -843,8 +842,12 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="x unified",  # 恢復你習慣的整條垂直線統一提示
-        margin=dict(l=60, r=40, t=10, b=50),
+        hovermode="x unified",
+        hoverlabel=dict(
+            align="left",
+            yanchor="top"  # 將提示框向上對齊，避免擋住中間圖形
+        ),
+        margin=dict(l=60, r=40, t=30, b=50),  # 稍微增加上方邊距 (t=30)，讓置頂的提示框有足夠空間顯示
         legend=dict(
             y=0.5,
             yanchor="middle"
