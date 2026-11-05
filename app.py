@@ -743,7 +743,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 【關鍵修改】：改用各取樣點各自獨立的日期序列來繪製，避免不同取樣點在同一天被強行對齊混合
+    # 恢復原本整齊的時間對齊與連線結構
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -759,17 +759,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         ]
         
         for idx, sub_spec in enumerate(selected_specs):
-            sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
-            if "_dt" in sub_df.columns:
-                sub_df = sub_df.sort_values(by="_dt")
-            if len(sub_df) == 0:
-                continue
+            sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].sort_values(by="_dt" if "_dt" in clean_data.columns else clean_data.index)
             sub_color = color_palette[idx % len(color_palette)]
             
-            if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
+            if "_dt" in sub_df.columns:
                 sub_x = sub_df["_dt"].dt.strftime('%Y-%m-%d')
-            elif active_batch_col is not None and active_batch_col in sub_df.columns:
-                sub_x = sub_df[active_batch_col].astype(str).str.strip()
+            elif active_batch_col is not None and "_x_val" in sub_df.columns:
+                sub_x = sub_df["_x_val"]
             else:
                 sub_x = sub_df.index.astype(str)
                 
@@ -843,6 +839,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         ),
         xaxis=dict(
             type='category',
+            categoryorder='array',
+            categoryarray=unique_sorted_dates,
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
@@ -928,7 +926,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
 
     with st.expander("點此查看該項目的完整歷史數據明細"):
-        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_keyword=False, use_container_width=True, key="history_data_table")
+        # 這裡會過濾掉測定值為空的列，確保明細資料表只顯示當天有實際檢驗數值的資料
+        st.dataframe(clean_data.dropna(subset=["測定值"]).drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
         
 elif len(raw_specs_list) > 0 and len(selected_specs) > 0:
     st.warning("該篩選條件下沒有對應的數據。")
