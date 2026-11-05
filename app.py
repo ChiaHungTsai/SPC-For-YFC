@@ -685,7 +685,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
     # 1. 統計摘要標題
-    # 修改處：直接將所有被勾選的取樣點用逗號串接完整顯示
     specs_display_text = ", ".join(selected_specs) if len(selected_specs) > 0 else ""
     spec_display_part = f" ➔ <span style='color: #dc2626;'>{specs_display_text}</span>" if len(selected_specs) > 0 else ""
     summary_title_html = f"""
@@ -734,7 +733,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 2. 管制圖標題
+    # 2. 管制圖標題 (這裡直接完整展開顯示所有被選取的項目，不顯示「多選」)
     chart_title_html = f"""
     <div class="highlight-title-box">
         <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
@@ -846,7 +845,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         margin=dict(l=60, r=40, t=50, b=50),
         legend=dict(
             y=0.5,
-            yanchor="middle"
+            yanchor="middle",
+            bordercolor="#cbd5e1",  # 加上圖例外框顏色
+            borderwidth=1          # 加上圖例外框寬度
         ),
         xaxis=dict(
             type='category',
