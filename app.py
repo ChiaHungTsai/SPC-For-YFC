@@ -743,7 +743,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 恢復原本整齊的時間對齊與連線結構
+    # 【完美修正】：維持正確的時間軸對齊，但將 hovermode 改為 "closest" 以避免跨日抓取顯示舊數值，並設定 connectgaps=False 避免空值連線
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -774,7 +774,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 mode='lines+markers',
                 name=f"{sub_spec}",
                 line=dict(color=sub_color, width=2.5),
-                marker=dict(size=7)
+                marker=dict(size=7),
+                connectgaps=False
             ))
     else:
         fig.add_trace(go.Scatter(
@@ -782,7 +783,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             mode='lines+markers',
             name=selected_param,
             line=dict(color='#2563eb', width=2),
-            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols)
+            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols),
+            connectgaps=False
         ))
         
         fig.add_hline(
@@ -831,7 +833,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="x unified",
+        hovermode="closest",  # 改為 closest，滑鼠指到哪裡就只顯示該點的真實數值，絕不跨日抓舊資料
         margin=dict(l=60, r=40, t=10, b=50),
         legend=dict(
             y=0.5,
@@ -926,8 +928,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
 
     with st.expander("點此查看該項目的完整歷史數據明細"):
-        # 這裡會過濾掉測定值為空的列，確保明細資料表只顯示當天有實際檢驗數值的資料
-        st.dataframe(clean_data.dropna(subset=["測定值"]).drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
+        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
         
 elif len(raw_specs_list) > 0 and len(selected_specs) > 0:
     st.warning("該篩選條件下沒有對應的數據。")
