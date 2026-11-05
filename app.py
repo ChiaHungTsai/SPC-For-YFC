@@ -248,16 +248,19 @@ for rc in required_cols:
 def on_unit_change():
     st.session_state.pop("selected_stage", None)
     st.session_state.pop("current_product", None)
-    st.session_state.pop("selected_spec_btn", None)
+    st.session_state.pop("current_spec", None)
     st.session_state.pop("current_param", None)
 
 def on_stage_change():
     st.session_state.pop("current_product", None)
-    st.session_state.pop("selected_spec_btn", None)
+    st.session_state.pop("current_spec", None)
     st.session_state.pop("current_param", None)
 
 def on_product_change():
-    st.session_state.pop("selected_spec_btn", None)
+    st.session_state.pop("current_spec", None)
+    st.session_state.pop("current_param", None)
+
+def on_spec_change():
     st.session_state.pop("current_param", None)
 
 # ==================== 頂部主標題與「更新資料」按鈕同行配置 ====================
@@ -373,7 +376,7 @@ for stage_label, raw_name in stages_dict.items():
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱選單 ====================
+# ==================== 3. 樣品名稱選單 (維持原本下拉) ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -397,64 +400,86 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-# 如果有多個取樣點，加上「多選」按鈕選項；若只有一個則直接顯示該項目
-if len(raw_specs_list) > 1:
-    spec_options = ["多選"] + raw_specs_list
-else:
-    spec_options = raw_specs_list
-
-if "selected_spec_btn" not in st.session_state or st.session_state["selected_spec_btn"] not in spec_options:
-    st.session_state["selected_spec_btn"] = spec_options[0] if spec_options else ""
-
-selected_spec_mode = st.session_state["selected_spec_btn"]
-
-# 樣品名稱與按鈕群組的排版列 (權重設計與製造單位按鈕群組一致)
+# 原本的「取樣點/規格」下拉選單保持原狀不變
 with cols_row3[3]:
-    st.markdown('<div class="row-label">欲顯示的取樣點/規格</div>', unsafe_allow_html=True)
+    st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
 
-# 為了讓取樣點按鈕群組像製造單位一樣整齊並自動延展，我們使用彈性欄位分配
-# 假設取樣點選項數量較多時，採用動態寬度比例分配
-num_opts = len(spec_options) if spec_options else 1
-spec_col_weights = [1.2] * num_opts + [max(0.1, 7.5 - num_opts * 1.2)]
-cols_spec_btns = st.columns(spec_col_weights)
-
-for idx, opt in enumerate(spec_options):
-    with cols_spec_btns[idx]:
-        is_active = (selected_spec_mode == opt)
-        if st.button(opt, key=f"spec_btn_{opt}", use_container_width=True, type="primary" if is_active else "secondary"):
-            if st.session_state["selected_spec_btn"] != opt:
-                st.session_state["selected_spec_btn"] = opt
-                st.rerun()
-
-# 根據按鈕選擇決定資料範圍與顯示名稱
-selected_sub_specs = []
-if selected_spec_mode == "多選" and len(raw_specs_list) > 1:
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    sub_cols = [0.7, 8.0]
-    with st.columns(sub_cols)[0]:
-        st.markdown('<div class="inline-sub-label" style="justify-content: flex-start; color: #1e3a8a;">勾選欲顯示項目</div>', unsafe_allow_html=True)
-    with st.columns(sub_cols)[1]:
-        selected_sub_specs = st.multiselect(
-            "勾選欲顯示的取樣點/規格",
-            options=raw_specs_list,
-            default=raw_specs_list,  # 預設全選
-            label_visibility="collapsed",
-            key="multi_spec_filter"
+with cols_row3[4]:
+    if len(raw_specs_list) > 0:
+        if "current_spec" not in st.session_state or st.session_state["current_spec"] not in raw_specs_list:
+            st.session_state["current_spec"] = raw_specs_list[0]
+            
+        selected_spec = st.selectbox(
+            "取樣點/規格",
+            raw_specs_list,
+            key="current_spec",
+            on_change=on_spec_change,
+            label_visibility="collapsed"
         )
-    if selected_sub_specs:
-        spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_sub_specs)]
-        selected_spec_display = "多選"
+        spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == selected_spec]
     else:
-        spec_df = pd.DataFrame(columns=prod_df.columns)
-        selected_spec_display = "多選 (未勾選)"
-elif selected_spec_mode in raw_specs_list:
-    selected_spec_display = selected_spec_mode
-    spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == selected_spec_mode]
-else:
-    selected_spec_display = None
-    spec_df = prod_df
+        selected_spec = None
+        st.selectbox(
+            "取樣點/規格",
+            ["無取樣點/規格資料"],
+            disabled=True,
+            key="sel_spec_disabled",
+            label_visibility="collapsed"
+        )
+        spec_df = prod_df
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
+
+# ==================== 新增：「欲顯示的取樣點/規格」按鈕群組區塊 ====================
+# 只有當該樣品有多個取樣點/規格時才顯示此按鈕群組列
+selected_sub_specs = []
+is_multiselect_mode = False
+
+if len(raw_specs_list) > 1:
+    grid_weights_multi = [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.8]
+    # 選項包含「多選」按鈕以及各個具體取樣點
+    multi_options = ["多選"] + raw_specs_list
+    
+    if "selected_multi_mode" not in st.session_state or st.session_state["selected_multi_mode"] not in multi_options:
+        st.session_state["selected_multi_mode"] = "多選" # 預設多選或第一個
+        
+    current_multi_mode = st.session_state["selected_multi_mode"]
+    
+    cols_multi = st.columns(grid_weights_multi)
+    with cols_multi[0]:
+        st.markdown('<div class="row-label">欲顯示的取樣點/規格</div>', unsafe_allow_html=True)
+        
+    for i, opt in enumerate(multi_options[:7]): # 最多取前7個按鈕位置對齊
+        with cols_multi[i + 1]:
+            is_active = (current_multi_mode == opt)
+            if st.button(opt, key=f"m_opt_{opt}", use_container_width=True, type="primary" if is_active else "secondary"):
+                if st.session_state["selected_multi_mode"] != opt:
+                    st.session_state["selected_multi_mode"] = opt
+                    st.rerun()
+                    
+    if current_multi_mode == "多選":
+        is_multiselect_mode = True
+        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+        sub_cols = [0.7, 8.0]
+        with st.columns(sub_cols)[0]:
+            st.markdown('<div class="inline-sub-label" style="justify-content: flex-start; color: #1e3a8a;">勾選欲顯示項目</div>', unsafe_allow_html=True)
+        with st.columns(sub_cols)[1]:
+            selected_sub_specs = st.multiselect(
+                "勾選欲顯示的取樣點/規格",
+                options=raw_specs_list,
+                default=raw_specs_list,
+                label_visibility="collapsed",
+                key="multi_spec_filter"
+            )
+        if selected_sub_specs:
+            spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_sub_specs)]
+        else:
+            spec_df = pd.DataFrame(columns=prod_df.columns)
+    else:
+        # 如果點擊了特定取樣點按鈕
+        spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip() == current_multi_mode]
+
+    st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
 # ==================== 4. 分析項目下拉選單 ====================
 params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
@@ -670,7 +695,8 @@ if len(clean_data) > 0:
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
     # 1. 統計摘要標題
-    spec_display_part = f" ➔ <span style='color: #dc2626;'>{selected_spec_display}</span>" if selected_spec_display else ""
+    spec_display_title = selected_spec if len(raw_specs_list) <= 1 else (current_multi_mode if current_multi_mode != "多選" else "多選")
+    spec_display_part = f" ➔ <span style='color: #dc2626;'>{spec_display_title}</span>" if spec_display_title else ""
     summary_title_html = f"""
     <div class="highlight-title-box">
         {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
@@ -728,7 +754,7 @@ if len(clean_data) > 0:
     fig = go.Figure()
     
     # 如果選擇「多選」，則依勾選的取樣點/規格分開畫出多條折線
-    if selected_spec_mode == "多選" and "取樣點/規格" in clean_data.columns:
+    if len(raw_specs_list) > 1 and current_multi_mode == "多選" and "取樣點/規格" in clean_data.columns:
         sub_specs = clean_data["取樣點/規格"].dropna().unique()
         color_palette = [
             '#0f172a',  # 極深黑藍
