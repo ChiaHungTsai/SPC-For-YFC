@@ -382,7 +382,8 @@ products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-row_weights = [0.7, 2.8, 0.45, 0.8, 2.8, 2.2]
+# 重新分配這一行的欄位比例：[標籤, 樣品名稱選單, 空白間距, 標籤, 取樣點選單, 全選按鈕, 右側留白]
+row_weights = [0.7, 2.8, 0.45, 0.8, 2.1, 0.7, 1.4]
 cols_row3 = st.columns(row_weights)
 
 with cols_row3[0]:
@@ -405,7 +406,6 @@ with cols_row3[3]:
 
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
-        # 初始化或過濾 session_state 中的選取項目
         if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
             st.session_state["current_spec"] = raw_specs_list.copy()
         else:
@@ -437,16 +437,10 @@ with cols_row3[4]:
         )
         spec_df = prod_df
 
-# 額外提供快捷「全選 / 清除」按鈕列，讓使用者更方便操作
-if len(raw_specs_list) > 0:
-    cols_btn_opt = st.columns([0.7, 2.8, 0.45, 0.8, 1.3, 1.3, 2.2])
-    with cols_btn_opt[4]:
-        if st.button("☑️ 全選規格", use_container_width=True):
+with cols_row3[5]:
+    if len(raw_specs_list) > 0:
+        if st.button("全選規格", use_container_width=True):
             st.session_state["current_spec"] = raw_specs_list.copy()
-            st.rerun()
-    with cols_btn_opt[5]:
-        if st.button("❌ 清除全選", use_container_width=True):
-            st.session_state["current_spec"] = []
             st.rerun()
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
@@ -461,7 +455,7 @@ if "current_param" not in st.session_state or st.session_state["current_param"] 
     else:
         st.session_state["current_param"] = params_list[0] if params_list else ""
 
-cols_param = st.columns(row_weights)
+cols_param = st.columns([0.7, 2.8, 0.45, 0.8, 2.8, 2.2])
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 with cols_param[1]:
