@@ -685,7 +685,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
     # 1. 統計摘要標題
-    specs_display_text = ", ".join(selected_specs) if len(selected_specs) <= 3 else f"多選 ({len(selected_specs)}個項目)"
+    # 修改處：直接將所有被勾選的取樣點用逗號串接完整顯示
+    specs_display_text = ", ".join(selected_specs) if len(selected_specs) > 0 else ""
     spec_display_part = f" ➔ <span style='color: #dc2626;'>{specs_display_text}</span>" if len(selected_specs) > 0 else ""
     summary_title_html = f"""
     <div class="highlight-title-box">
