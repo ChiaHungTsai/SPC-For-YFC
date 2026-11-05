@@ -244,6 +244,11 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
+# ==================== 自然排序輔助函數 ====================
+def natural_sort_key(s):
+    import re
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
+
 # ==================== 狀態回呼與瞬間聯動邏輯 ====================
 def on_unit_change():
     st.session_state.pop("selected_stage", None)
@@ -378,6 +383,8 @@ st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
 # ==================== 3. 樣品名稱與取樣點/規格選單 ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
+# 【樣品名稱排序】：讓樣品名稱也進行有序並固定排列
+products_list = sorted(products_list, key=natural_sort_key)
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
@@ -400,11 +407,7 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-# 【關鍵修正】：對取樣點/規格進行穩定排序（支援數字自然排序與字串排序），確保選單項目每次載入都按固定順序排列
-def natural_sort_key(s):
-    import re
-    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
-
+# 【取樣點/規格排序】：自然排序
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
 if len(raw_specs_list) > 1:
