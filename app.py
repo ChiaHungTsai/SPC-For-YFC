@@ -461,21 +461,17 @@ with cols_param[1]:
 final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list and selected_param != "請先選擇製程階段" else pd.DataFrame()
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇 (動態預設上下半年邏輯) ====================
+# ==================== 5. 檢驗日期區間選擇 ====================
 today = date.today()
 current_year = today.year
 
-# 判斷當天是當年的上半年 (1月~6月) 還是下半年 (7月~12月)
 if today.month <= 6:
-    # 上半年預設：前年度 1/1
     default_start = date(current_year - 1, 1, 1)
 else:
-    # 下半年預設：當年度 1/1
     default_start = date(current_year, 1, 1)
 
 default_end = today
 
-# 如果 session_state 裡面還沒有記錄日期，才賦予動態預設值；一旦使用者調整過就予以保留固定
 if "start_date" not in st.session_state:
     st.session_state["start_date"] = default_start
 if "end_date" not in st.session_state:
@@ -715,7 +711,19 @@ if len(clean_data) > 0:
     # 如果選擇「全部」，則依不同的取樣點/規格分開畫出多條折線
     if selected_spec == "全部" and "取樣點/規格" in clean_data.columns:
         sub_specs = clean_data["取樣點/規格"].dropna().unique()
-        color_palette = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+        # 【色彩重劃】：全面採用與綠(平均)、紅(規格)、橘(管制)差異極大且互相好辨識的高對比專業色系
+        color_palette = [
+            '#1e40af',  # 靛藍色 (Deep Blue)
+            '#9333ea',  # 紫色 (Purple)
+            '#0891b2',  # 青藍色 (Cyan)
+            '#db2777',  # 桃紅色 (Pink)
+            '#4338ca',  # 寶藍色 (Indigo)
+            '#0d9488',  # 湖水綠/藍綠 (Teal) - 與平均線之翠綠明顯區隔
+            '#c026d3',  # 品紅色 (Fuchsia)
+            '#2563eb',  # 標準藍 (Royal Blue)
+            '#7c3aed',  # 亮紫羅蘭 (Violet)
+            '#0284c7'   # 天藍色 (Sky Blue)
+        ]
         
         for idx, sub_spec in enumerate(sub_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].sort_values(by="_dt")
