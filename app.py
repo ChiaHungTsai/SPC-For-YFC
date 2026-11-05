@@ -400,7 +400,13 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-if len(raw_specs_list) > 0:
+# 修改預設邏輯：若有多個取樣點/規格，預設為空串列（全部取消）；若只有 1 個則預設選取該個
+if len(raw_specs_list) > 1:
+    if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
+        st.session_state["current_spec"] = []
+    else:
+        st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
+elif len(raw_specs_list) == 1:
     if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
         st.session_state["current_spec"] = raw_specs_list.copy()
     else:
@@ -439,7 +445,6 @@ with cols_row3[4]:
         else:
             spec_df = prod_df.iloc[0:0]
     else:
-        # 當該樣品沒有取樣點/規格資料時，直接使用整批 prod_df 並且預設為選取狀態，讓 SPC 圖能正常運算
         selected_specs = []
         spec_df = prod_df
         st.multiselect(
@@ -459,7 +464,6 @@ with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
 with cols_param[1]:
-    # 若有取樣點規格且未清空，或者本身根本沒有取樣點規格資料（即 len(raw_specs_list) == 0），均可正常顯示分析項目
     if len(raw_specs_list) == 0 or len(selected_specs) > 0:
         params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
 
