@@ -283,6 +283,7 @@ with header_cols[0]:
 
 with header_cols[1]:
     st.markdown('<div class="refresh-btn-fixed">', unsafe_allow_html=True)
+    # 【關鍵修改】：點擊後僅清除資料快取並重新載入，不主動呼叫 st.session_state.clear()，保留所有使用者的選擇狀態
     if st.button("🔄 更新資料", use_container_width=False):
         st.cache_data.clear()
         st.rerun()
@@ -477,7 +478,6 @@ with cols_param[0]:
 with cols_param[1]:
     if len(raw_specs_list) == 0 or len(selected_specs) > 0:
         params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
-        # 【分析項目排序】：讓分析項目清單也進行有序並固定排列
         params_list = sorted(params_list, key=natural_sort_key)
 
         if "current_param" not in st.session_state or st.session_state["current_param"] not in params_list:
