@@ -439,7 +439,9 @@ with cols_row3[4]:
         else:
             spec_df = prod_df.iloc[0:0]
     else:
+        # 當該樣品沒有取樣點/規格資料時，直接使用整批 prod_df 並且預設為選取狀態，讓 SPC 圖能正常運算
         selected_specs = []
+        spec_df = prod_df
         st.multiselect(
             "取樣點/規格",
             options=["無取樣點/規格資料"],
@@ -448,32 +450,44 @@ with cols_row3[4]:
             key="sel_spec_disabled",
             label_visibility="collapsed"
         )
-        spec_df = prod_df
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
 # ==================== 4. 分析項目下拉選單 ====================
-params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
-
-if "current_param" not in st.session_state or st.session_state["current_param"] not in params_list:
-    default_p = next((p for p in params_list if "濃度" in p), None)
-    if default_p:
-        st.session_state["current_param"] = default_p
-    else:
-        st.session_state["current_param"] = params_list[0] if params_list else ""
-
 cols_param = st.columns([0.7, 2.8, 0.45, 0.8, 2.8, 2.2])
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
-with cols_param[1]:
-    selected_param = st.selectbox(
-        "分析項目", 
-        params_list if params_list else ["請先選擇樣品名稱"], 
-        key="current_param", 
-        label_visibility="collapsed"
-    )
 
-final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list and selected_param != "請先選擇製程階段" else pd.DataFrame()
+with cols_param[1]:
+    # 若有取樣點規格且未清空，或者本身根本沒有取樣點規格資料（即 len(raw_specs_list) == 0），均可正常顯示分析項目
+    if len(raw_specs_list) == 0 or len(selected_specs) > 0:
+        params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
+
+        if "current_param" not in st.session_state or st.session_state["current_param"] not in params_list:
+            default_p = next((p for p in params_list if "濃度" in p), None)
+            if default_p:
+                st.session_state["current_param"] = default_p
+            else:
+                st.session_state["current_param"] = params_list[0] if params_list else ""
+
+        selected_param = st.selectbox(
+            "分析項目", 
+            params_list if params_list else ["請先選擇樣品名稱"], 
+            key="current_param", 
+            label_visibility="collapsed"
+        )
+        final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list else pd.DataFrame()
+    else:
+        st.selectbox(
+            "分析項目", 
+            ["請先選擇取樣點/規格"], 
+            disabled=True, 
+            key="param_disabled", 
+            label_visibility="collapsed"
+        )
+        final_df = pd.DataFrame()
+        selected_param = None
+
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # ==================== 5. 檢驗日期區間選擇 ====================
@@ -537,7 +551,7 @@ if len(filtered_df) > 0 and "檢驗日期" in final_df.columns:
 st.markdown("<hr style='margin: 12px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
 
 # ==================== 數據小數點位數讀取與圖表渲染 ====================
-if len(selected_specs) == 0:
+if len(raw_specs_list) > 0 and len(selected_specs) == 0:
     st.warning("尚未選擇取樣點/規格")
 elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     clean_data = filtered_df.dropna(subset=["測定值"]).copy()
@@ -612,7 +626,7 @@ else:
     unique_sorted_dates = []
     xaxis_title_text = "日期"
 
-if len(selected_specs) > 0 and len(clean_data) > 0:
+if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
     values = clean_data["測定值"]
     mean_val = values.mean()
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
@@ -669,7 +683,7 @@ if len(selected_specs) > 0 and len(clean_data) > 0:
 
     # 1. 統計摘要標題
     specs_display_text = ", ".join(selected_specs) if len(selected_specs) <= 3 else f"多選 ({len(selected_specs)}個項目)"
-    spec_display_part = f" ➔ <span style='color: #dc2626;'>{specs_display_text}</span>" if selected_specs else ""
+    spec_display_part = f" ➔ <span style='color: #dc2626;'>{specs_display_text}</span>" if len(selected_specs) > 0 else ""
     summary_title_html = f"""
     <div class="highlight-title-box">
         {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
@@ -726,7 +740,7 @@ if len(selected_specs) > 0 and len(clean_data) > 0:
 
     fig = go.Figure()
     
-    # 若勾選多個取樣點/規格，則依不同的取樣點/規格分開畫出多條折線
+    # 若有勾選多個取樣點/規格，則依不同的取樣點/規格分開畫出多條折線
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -913,5 +927,5 @@ if len(selected_specs) > 0 and len(clean_data) > 0:
     with st.expander("點此查看該項目的完整歷史數據明細"):
         st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
         
-elif len(selected_specs) > 0:
+elif len(raw_specs_list) > 0 and len(selected_specs) > 0:
     st.warning("該篩選條件下沒有對應的數據。")
