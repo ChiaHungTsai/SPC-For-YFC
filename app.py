@@ -711,18 +711,18 @@ if len(clean_data) > 0:
     # 如果選擇「全部」，則依不同的取樣點/規格分開畫出多條折線
     if selected_spec == "全部" and "取樣點/規格" in clean_data.columns:
         sub_specs = clean_data["取樣點/規格"].dropna().unique()
-        # 【色彩重劃】：全面採用與綠(平均)、紅(規格)、橘(管制)差異極大且互相好辨識的高對比專業色系
+        # 【全新高度辨識色彩配置】：採用色相差距極大的亮色與深色交錯（避開紅、綠、橘）
         color_palette = [
-            '#1e40af',  # 靛藍色 (Deep Blue)
-            '#9333ea',  # 紫色 (Purple)
-            '#0891b2',  # 青藍色 (Cyan)
-            '#db2777',  # 桃紅色 (Pink)
-            '#4338ca',  # 寶藍色 (Indigo)
-            '#0d9488',  # 湖水綠/藍綠 (Teal) - 與平均線之翠綠明顯區隔
-            '#c026d3',  # 品紅色 (Fuchsia)
-            '#2563eb',  # 標準藍 (Royal Blue)
-            '#7c3aed',  # 亮紫羅蘭 (Violet)
-            '#0284c7'   # 天藍色 (Sky Blue)
+            '#0f172a',  # 極深黑藍 (Slate 900)
+            '#0d9488',  # 鮮明青綠 (Teal 600)
+            '#d97706',  # 琥珀金黃 (Amber 600)
+            '#db2777',  # 亮桃紅 (Pink 600)
+            '#7c3aed',  # 亮紫色 (Violet 600)
+            '#0284c7',  # 亮天藍 (Sky 600)
+            '#65a30d',  # 青草黃綠 (Lime 600)
+            '#9333ea',  # 寶石紫 (Purple 600)
+            '#4f46e5',  # 靛青色 (Indigo 600)
+            '#ca8a04'   # 深土黃 (Yellow 600)
         ]
         
         for idx, sub_spec in enumerate(sub_specs):
@@ -740,8 +740,8 @@ if len(clean_data) > 0:
                 x=sub_x, y=sub_df["測定值"],
                 mode='lines+markers',
                 name=f"{sub_spec}",
-                line=dict(color=sub_color, width=2),
-                marker=dict(size=6)
+                line=dict(color=sub_color, width=2.5),
+                marker=dict(size=7)
             ))
     else:
         fig.add_trace(go.Scatter(
