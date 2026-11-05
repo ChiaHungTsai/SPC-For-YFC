@@ -401,6 +401,13 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
+# 【修正處】：在宣告 multiselect 之前，先透過按鈕修改 session_state，避免 Widget 已經 Instantiate 後被強行覆寫
+with cols_row3[5]:
+    if len(raw_specs_list) > 0:
+        if st.button("全選規格", use_container_width=True):
+            st.session_state["current_spec"] = raw_specs_list.copy()
+            st.rerun()
+
 with cols_row3[3]:
     st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
 
@@ -436,12 +443,6 @@ with cols_row3[4]:
             label_visibility="collapsed"
         )
         spec_df = prod_df
-
-with cols_row3[5]:
-    if len(raw_specs_list) > 0:
-        if st.button("全選規格", use_container_width=True):
-            st.session_state["current_spec"] = raw_specs_list.copy()
-            st.rerun()
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
