@@ -8,7 +8,7 @@ from datetime import date
 # 1. 網頁基本設定 (寬螢幕、隱藏側邊欄)
 st.set_page_config(page_title="義芳化學品保科 - SPC 統計製程管制儀表板", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 自訂 CSS
+# 2. 自訂 CSS (包含強制讓 multiselect 下拉選單顯示核取方框與支援捲動)
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {display: none;}
@@ -49,12 +49,14 @@ st.markdown("""
         line-height: 1.2;
     }
     
+    /* 讓 multiselect 下拉選單支援捲動並加上核取方框視覺優化 */
     div[data-baseweb="popover"] {
         width: max-content !important;
         min-width: 280px !important;
     }
     div[data-baseweb="popover"] div[role="listbox"] {
         max-height: 350px !important;
+        overflow-y: auto !important;
     }
     div[data-baseweb="popover"] div[role="listbox"] div {
         white-space: normal !important;
@@ -383,7 +385,6 @@ st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
 # ==================== 3. 樣品名稱與取樣點/規格選單 ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
-# 【樣品名稱排序】：讓樣品名稱也進行有序並固定排列
 products_list = sorted(products_list, key=natural_sort_key)
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
@@ -407,7 +408,6 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-# 【取樣點/規格排序】：自然排序
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
 if len(raw_specs_list) > 1:
@@ -449,6 +449,9 @@ with cols_row3[4]:
             label_visibility="collapsed"
         )
         
+        # 【關鍵修復】：根據原本固定的 raw_specs_list 順序對勾選的項目進行重新排序，確保圖表與資料排序永遠固定，不會因點選順序而亂跳
+        selected_specs = [s for s in raw_specs_list if s in selected_specs]
+        
         if len(selected_specs) > 0:
             spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_specs)]
         else:
@@ -475,6 +478,7 @@ with cols_param[0]:
 with cols_param[1]:
     if len(raw_specs_list) == 0 or len(selected_specs) > 0:
         params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
+        params_list = sorted(params_list, key=natural_sort_key)
 
         if "current_param" not in st.session_state or st.session_state["current_param"] not in params_list:
             default_p = next((p for p in params_list if "濃度" in p), None)
