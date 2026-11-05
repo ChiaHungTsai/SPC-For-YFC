@@ -382,7 +382,7 @@ products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-row_weights = [0.7, 2.8, 0.45, 0.8, 2.1, 0.7, 1.4]
+row_weights = [0.7, 2.8, 0.45, 0.8, 1.7, 0.75, 0.75, 1.1]
 cols_row3 = st.columns(row_weights)
 
 with cols_row3[0]:
@@ -400,23 +400,25 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
-# 先確保 current_spec 狀態正確初始化
 if len(raw_specs_list) > 0:
     if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
         st.session_state["current_spec"] = raw_specs_list.copy()
     else:
         st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
-        if not st.session_state["current_spec"]:
-            st.session_state["current_spec"] = raw_specs_list.copy()
 
-# 判斷是否已經「全選」所有規格
 is_all_selected = len(raw_specs_list) > 0 and set(st.session_state.get("current_spec", [])) == set(raw_specs_list)
+is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
-# 「全選」按鈕（若已全選則設為 disabled=True，會自動套用灰色斜線樣式）
 with cols_row3[5]:
     if len(raw_specs_list) > 0:
-        if st.button("全選", use_container_width=True, disabled=is_all_selected):
+        if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
             st.session_state["current_spec"] = raw_specs_list.copy()
+            st.rerun()
+
+with cols_row3[6]:
+    if len(raw_specs_list) > 0:
+        if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
+            st.session_state["current_spec"] = []
             st.rerun()
 
 with cols_row3[3]:
@@ -535,7 +537,9 @@ if len(filtered_df) > 0 and "檢驗日期" in final_df.columns:
 st.markdown("<hr style='margin: 12px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
 
 # ==================== 數據小數點位數讀取與圖表渲染 ====================
-if len(filtered_df) > 0 and "測定值" in filtered_df.columns:
+if len(selected_specs) == 0:
+    st.warning("尚未選擇取樣點/規格")
+elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     clean_data = filtered_df.dropna(subset=["測定值"]).copy()
     
     decimal_places = 2
@@ -608,7 +612,7 @@ else:
     unique_sorted_dates = []
     xaxis_title_text = "日期"
 
-if len(clean_data) > 0:
+if len(selected_specs) > 0 and len(clean_data) > 0:
     values = clean_data["測定值"]
     mean_val = values.mean()
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
@@ -909,5 +913,5 @@ if len(clean_data) > 0:
     with st.expander("點此查看該項目的完整歷史數據明細"):
         st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
         
-else:
+elif len(selected_specs) > 0:
     st.warning("該篩選條件下沒有對應的數據。")
