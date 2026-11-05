@@ -405,11 +405,10 @@ with cols_row3[3]:
 
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
-        # 改為多選 (st.multiselect)
+        # 初始化或過濾 session_state 中的選取項目
         if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
-            st.session_state["current_spec"] = raw_specs_list.copy() # 預設全選
+            st.session_state["current_spec"] = raw_specs_list.copy()
         else:
-            # 過濾確保選項依然存在
             st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
             if not st.session_state["current_spec"]:
                 st.session_state["current_spec"] = raw_specs_list.copy()
@@ -425,7 +424,7 @@ with cols_row3[4]:
         if len(selected_specs) > 0:
             spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_specs)]
         else:
-            spec_df = prod_df.iloc[0:0] # 若未選取任何項目則為空
+            spec_df = prod_df.iloc[0:0]
     else:
         selected_specs = []
         st.multiselect(
@@ -437,6 +436,18 @@ with cols_row3[4]:
             label_visibility="collapsed"
         )
         spec_df = prod_df
+
+# 額外提供快捷「全選 / 清除」按鈕列，讓使用者更方便操作
+if len(raw_specs_list) > 0:
+    cols_btn_opt = st.columns([0.7, 2.8, 0.45, 0.8, 1.3, 1.3, 2.2])
+    with cols_btn_opt[4]:
+        if st.button("☑️ 全選規格", use_container_width=True):
+            st.session_state["current_spec"] = raw_specs_list.copy()
+            st.rerun()
+    with cols_btn_opt[5]:
+        if st.button("❌ 清除全選", use_container_width=True):
+            st.session_state["current_spec"] = []
+            st.rerun()
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
