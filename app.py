@@ -283,7 +283,6 @@ with header_cols[0]:
 
 with header_cols[1]:
     st.markdown('<div class="refresh-btn-fixed">', unsafe_allow_html=True)
-    # 【關鍵修改】：點擊後僅清除資料快取並重新載入，不主動呼叫 st.session_state.clear()，保留所有使用者的選擇狀態
     if st.button("🔄 更新資料", use_container_width=False):
         st.cache_data.clear()
         st.rerun()
@@ -620,6 +619,8 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
         sort_cols = ["_dt"] + ([active_batch_col] if active_batch_col is not None else [])
         clean_data = clean_data.sort_values(by=sort_cols, ascending=True).reset_index(drop=True)
         
+        # 【關鍵修改】：將 X 軸改為真實的日期時間軸類型 (type='date')
+        # 這樣當中間隔了好幾天沒有數據時，折線會自動斷開，不會被強行直線相連
         unique_sorted_dates = clean_data["_dt"].dropna().dt.strftime('%Y-%m-%d').unique().tolist()
         unique_sorted_dates.sort()
         
@@ -776,7 +777,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             sub_df = sub_df.dropna(subset=["測定值"])
             if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
                 sub_df = sub_df.sort_values(by="_dt")
-                sub_x = sub_df["_dt"].dt.strftime('%Y-%m-%d')
+                sub_x = sub_df["_dt"]  # 傳入 datetime 物件供 type='date' 使用
             elif active_batch_col is not None and active_batch_col in sub_df.columns:
                 sub_df = sub_df.sort_values(by=active_batch_col)
                 sub_x = sub_df[active_batch_col].astype(str).str.strip()
@@ -794,11 +795,16 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 name=f"{sub_spec}",
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=7),
-                connectgaps=False
+                connectgaps=False  # 確保不連續的日期之間不會強行連線
             ))
     else:
+        if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
+            single_x = clean_data["_dt"]
+        else:
+            single_x = x_labels
+            
         fig.add_trace(go.Scatter(
-            x=x_labels, y=values,
+            x=single_x, y=values,
             mode='lines+markers',
             name=selected_param,
             line=dict(color='#2563eb', width=2),
@@ -864,13 +870,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='category',
-            categoryorder='array',
-            categoryarray=unique_sorted_dates,
+            type='date',  # 【關鍵修改】：改為日期型態軸，讓未檢驗的空檔自動依時間比例斷開，不再強行直線連接
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
-            nticks=30,
             showline=True,
             linewidth=1,
             linecolor='black',
