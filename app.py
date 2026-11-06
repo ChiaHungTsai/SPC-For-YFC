@@ -615,12 +615,13 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     if active_batch_col is not None:
         clean_data["_x_val"] = clean_data[active_batch_col].astype(str).str.strip()
 
+    # 【關鍵修復】：確保全域資料排序嚴格依照 _dt 進行時間升冪排序，杜絕日期順序錯亂
     if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
         sort_cols = ["_dt"] + ([active_batch_col] if active_batch_col is not None else [])
         clean_data = clean_data.sort_values(by=sort_cols, ascending=True).reset_index(drop=True)
         
-        unique_sorted_dates = clean_data["_dt"].dropna().dt.strftime('%Y-%m-%d').unique().tolist()
-        unique_sorted_dates.sort()
+        # 嚴格依照時間順序取得不重複的日期字串陣列
+        unique_sorted_dates = clean_data["_dt"].dropna().dt.strftime('%Y-%m-%d').drop_duplicates().tolist()
         
         x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d').fillna(clean_data.index.to_series().astype(str))
         xaxis_title_text = "日期"
@@ -688,11 +689,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         
         if is_spec_violate:
             marker_colors.append('#dc2626')   # 紅色
-            marker_symbols.append('x')        # 規格違規用交叉 (Standard Limit / USL/LSL)
+            marker_symbols.append('x')        # 規格違規用交叉
             marker_sizes.append(10)
         elif is_ctrl_violate:
             marker_colors.append('#f97316')   # 橘色
-            marker_symbols.append('circle')   # 管制違規用圓點 (Control Limit / UCL/LCL)
+            marker_symbols.append('circle')   # 管制違規用圓點
             marker_sizes.append(8)
         else:
             marker_colors.append('#2563eb')   # 藍色正常點
@@ -701,7 +702,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
-    # 1. 統計摘要標題 (包含製造單位與製程階段)
+    # 1. 統計摘要標題
     specs_display_text = ", ".join(selected_specs) if len(selected_specs) > 0 else ""
     spec_display_part = f" ➔ <span style='color: #dc2626;'>{specs_display_text}</span>" if len(selected_specs) > 0 else ""
     summary_title_html = f"""
@@ -750,7 +751,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 2. 管制圖標題 (包含製造單位與製程階段)
+    # 2. 管制圖標題
     chart_title_html = f"""
     <div class="highlight-title-box">
         {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
@@ -760,7 +761,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 結合「非連續天數自動斷線」與「規格/管制違規符號區分」
+    # 繪製圖表：結合「雙圖層（圓點 + 斷線線條）」與「嚴格按時間排序」
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -794,7 +795,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     if pd.isna(curr_dt):
                         continue
                     
-                    # 判斷異常狀態
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                     is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
                     
@@ -836,7 +836,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 line_x = marker_x
                 line_y = marker_y
             
-            # 繪製獨立圓點與斷線機制圖層
             fig.add_trace(go.Scatter(
                 x=marker_x, y=marker_y,
                 mode='markers',
@@ -955,7 +954,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         xaxis=dict(
             type='category',
             categoryorder='array',
-            categoryarray=unique_sorted_dates,
+            categoryarray=unique_sorted_dates,  # 嚴格依照時間排序後的日期陣列
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
