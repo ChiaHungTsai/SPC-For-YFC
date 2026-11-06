@@ -677,29 +677,22 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     clean_data["異常狀況"] = values.apply(check_anomaly)
     
-    # 建立精確的標記分類：
-    # 1. 規格違規 (超出 USL / LSL)：紅色 "❌"
-    # 2. 管制違規 (超出 UCL / LCL 但未超出規格)：橘色圓點 "circle"
-    # 3. 正常：藍色圓點 "circle"
     marker_colors = []
     marker_symbols = []
     marker_sizes = []
     
     for _, row in clean_data.iterrows():
         val = row["測定值"]
-        status = row["異常狀況"]
-        
-        # 額外精確判定是規格違反還是管制違反
         is_spec_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
         is_ctrl_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
         
         if is_spec_violate:
             marker_colors.append('#dc2626')   # 紅色
-            marker_symbols.append('x')        # 交叉記號表示超出規格 (Standard Limit)
+            marker_symbols.append('x')        # 規格違規用交叉 (Standard Limit / USL/LSL)
             marker_sizes.append(10)
         elif is_ctrl_violate:
             marker_colors.append('#f97316')   # 橘色
-            marker_symbols.append('circle')   # 圓形表示超出管制 (Control Limit)
+            marker_symbols.append('circle')   # 管制違規用圓點 (Control Limit / UCL/LCL)
             marker_sizes.append(8)
         else:
             marker_colors.append('#2563eb')   # 藍色正常點
@@ -708,7 +701,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
-    # 1. 統計摘要標題
+    # 1. 統計摘要標題 (包含製造單位與製程階段)
     specs_display_text = ", ".join(selected_specs) if len(selected_specs) > 0 else ""
     spec_display_part = f" ➔ <span style='color: #dc2626;'>{specs_display_text}</span>" if len(selected_specs) > 0 else ""
     summary_title_html = f"""
@@ -757,17 +750,17 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 2. 管制圖標題
+    # 2. 管制圖標題 (包含製造單位與製程階段)
     chart_title_html = f"""
     <div class="highlight-title-box">
-        <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
     </div>
     """
     st.markdown(chart_title_html, unsafe_allow_html=True)
 
     fig = go.Figure()
     
-    # 恢復原本乾淨、連續連線的單一 Trace 結構，讓所有圓點和折線正常顯示，同時加入不同違規狀態的圖示區分
+    # 結合「非連續天數自動斷線」與「規格/管制違規符號區分」
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -785,55 +778,121 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         for idx, sub_spec in enumerate(selected_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
             sub_df = sub_df.dropna(subset=["測定值"])
-            if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
-                sub_df = sub_df.sort_values(by="_dt")
-                sub_x = sub_df["_dt"].dt.strftime('%Y-%m-%d')
-            elif active_batch_col is not None and active_batch_col in sub_df.columns:
-                sub_df = sub_df.sort_values(by=active_batch_col)
-                sub_x = sub_df[active_batch_col].astype(str).str.strip()
-            else:
-                sub_x = sub_df.index.astype(str)
-                
             if len(sub_df) == 0:
                 continue
                 
             sub_color = color_palette[idx % len(color_palette)]
             
-            # 針對多選各曲線的異常點個別判斷顏色與形狀
-            sub_colors = []
-            sub_symbols = []
-            sub_sizes = []
-            for _, r_val in sub_df.iterrows():
-                val = r_val["測定值"]
-                is_spec = (usl is not None and val > usl) or (lsl is not None and val < lsl)
-                is_ctrl = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
-                if is_spec:
-                    sub_colors.append('#dc2626')
-                    sub_symbols.append('x')
-                    sub_sizes.append(10)
-                elif is_ctrl:
-                    sub_colors.append('#f97316')
-                    sub_symbols.append('circle')
-                    sub_sizes.append(8)
-                else:
-                    sub_colors.append(sub_color)
-                    sub_symbols.append('circle')
-                    sub_sizes.append(6)
-
+            if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
+                sub_df = sub_df.sort_values(by="_dt")
+                line_x, line_y = [], []
+                marker_x, marker_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
+                
+                for i in range(len(sub_df)):
+                    curr_dt = sub_df["_dt"].iloc[i]
+                    curr_val = sub_df["測定值"].iloc[i]
+                    if pd.isna(curr_dt):
+                        continue
+                    
+                    # 判斷異常狀態
+                    is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                    is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                    
+                    if is_spec:
+                        m_col, m_sym, m_sz = '#dc2626', 'x', 10
+                    elif is_ctrl:
+                        m_col, m_sym, m_sz = '#f97316', 'circle', 8
+                    else:
+                        m_col, m_sym, m_sz = sub_color, 'circle', 6
+                        
+                    marker_x.append(curr_dt.strftime('%Y-%m-%d'))
+                    marker_y.append(curr_val)
+                    marker_colors_sub.append(m_col)
+                    marker_symbols_sub.append(m_sym)
+                    marker_sizes_sub.append(m_sz)
+                    
+                    if i > 0:
+                        prev_dt = sub_df["_dt"].iloc[i - 1]
+                        if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
+                            line_x.append((prev_dt + timedelta(days=1)).strftime('%Y-%m-%d'))
+                            line_y.append(None)
+                    line_x.append(curr_dt.strftime('%Y-%m-%d'))
+                    line_y.append(curr_val)
+            else:
+                sub_x_col = active_batch_col if active_batch_col and active_batch_col in sub_df.columns else sub_df.index
+                sub_df = sub_df.sort_values(by=sub_x_col)
+                marker_x = sub_df[sub_x_col].astype(str).str.strip().tolist()
+                marker_y = sub_df["測定值"].tolist()
+                marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], []
+                for v_val in marker_y:
+                    is_spec = (usl is not None and v_val > usl) or (lsl is not None and v_val < lsl)
+                    is_ctrl = (ucl is not None and v_val > ucl) or (lcl is not None and v_val < lcl)
+                    if is_spec:
+                        marker_colors_sub.append('#dc2626'); marker_symbols_sub.append('x'); marker_sizes_sub.append(10)
+                    elif is_ctrl:
+                        marker_colors_sub.append('#f97316'); marker_symbols_sub.append('circle'); marker_sizes_sub.append(8)
+                    else:
+                        marker_colors_sub.append(sub_color); marker_symbols_sub.append('circle'); marker_sizes_sub.append(6)
+                line_x = marker_x
+                line_y = marker_y
+            
+            # 繪製獨立圓點與斷線機制圖層
             fig.add_trace(go.Scatter(
-                x=sub_x, y=sub_df["測定值"],
-                mode='lines+markers',
+                x=marker_x, y=marker_y,
+                mode='markers',
+                name=f"{sub_spec}",
+                marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
+                legendgroup=sub_spec
+            ))
+            fig.add_trace(go.Scatter(
+                x=line_x, y=line_y,
+                mode='lines',
                 name=f"{sub_spec}",
                 line=dict(color=sub_color, width=2.5),
-                marker=dict(size=sub_sizes, color=sub_colors, symbol=sub_symbols)
+                showlegend=False,
+                legendgroup=sub_spec,
+                connectgaps=False
             ))
     else:
+        if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
+            clean_data = clean_data.sort_values(by="_dt")
+            line_x, line_y = [], []
+            marker_x, marker_y = [], []
+            for i in range(len(clean_data)):
+                curr_dt = clean_data["_dt"].iloc[i]
+                curr_val = clean_data["測定值"].iloc[i]
+                if pd.isna(curr_dt):
+                    continue
+                if i > 0:
+                    prev_dt = clean_data["_dt"].iloc[i - 1]
+                    if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
+                        line_x.append((prev_dt + timedelta(days=1)).strftime('%Y-%m-%d'))
+                        line_y.append(None)
+                line_x.append(curr_dt.strftime('%Y-%m-%d'))
+                line_y.append(curr_val)
+                marker_x.append(curr_dt.strftime('%Y-%m-%d'))
+                marker_y.append(curr_val)
+        else:
+            marker_x = x_labels.tolist() if hasattr(x_labels, "tolist") else list(x_labels)
+            marker_y = values.tolist() if hasattr(values, "tolist") else list(values)
+            line_x = marker_x
+            line_y = marker_y
+
         fig.add_trace(go.Scatter(
-            x=x_labels, y=values,
-            mode='lines+markers',
+            x=marker_x, y=marker_y,
+            mode='markers',
+            name=selected_param,
+            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols),
+            legendgroup="single"
+        ))
+        fig.add_trace(go.Scatter(
+            x=line_x, y=line_y,
+            mode='lines',
             name=selected_param,
             line=dict(color='#2563eb', width=2),
-            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols)
+            showlegend=False,
+            legendgroup="single",
+            connectgaps=False
         ))
         
         fig.add_hline(
