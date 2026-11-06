@@ -756,9 +756,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 【核心修正】：保持原本乾淨的類別型 X 軸格式。
-    # 針對每個取樣點，我們計算相鄰兩筆數據的日期差距：如果相隔超過 1 天（即非連續天數），
-    # 我們就在中間插入一個 `None`（空值）點，這樣 Plotly 畫圖時遇到 `None` 就會自動斷開線條，不會跨越很長一段時間硬連線！
+    # 【完美解決方案】：
+    # 為了讓資料點（圓點）永遠完整顯示、同時又能讓相隔超過 1 天的資料「自動斷線」，
+    # 我們採用「雙圖層（Markers + Lines）」機制：
+    # 1. 圓點圖層（Markers）：負責畫出所有實際存在的數據點，確保任何孤立的點都不會消失。
+    # 2. 線條圖層（Lines）：負責畫折線，並在相隔超過 1 天時安全斷開，維持原本的座標軸格式與美觀。
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -775,69 +777,102 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         
         for idx, sub_spec in enumerate(selected_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
-            sub_df = sub_df.dropna(subset=["測定值"])
+            sub_df = sub_df.dropna(subset=["測定Val" if "測定Val" in sub_df.columns else "測定值"])
+            val_col = "測定值"
+            sub_df = sub_df.dropna(subset=[val_col])
             if len(sub_df) == 0:
                 continue
                 
+            sub_color = color_palette[idx % len(color_palette)]
+            
             if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
                 sub_df = sub_df.sort_values(by="_dt")
-                # 建立具備防呆中斷機制的資料序列：檢查相鄰日期是否連續（差值 <= 1天）
-                plot_x = []
-                plot_y = []
+                marker_x = sub_df["_dt"].dt.strftime('%Y-%m-%d').tolist()
+                marker_y = sub_df[val_col].tolist()
+                
+                # 計算線條斷點
+                line_x = []
+                line_y = []
                 for i in range(len(sub_df)):
-                    curr_date = sub_df["_dt"].iloc[i]
-                    curr_val = sub_df["測定值"].iloc[i]
+                    curr_dt = sub_df["_dt"].iloc[i]
+                    curr_val = sub_df[val_col].iloc[i]
+                    if pd.isna(curr_dt):
+                        continue
                     if i > 0:
-                        prev_date = sub_df["_dt"].iloc[i - 1]
-                        # 如果相隔超過 1 天，插入一個帶有中間虛擬日期或 None 的斷點
-                        if (curr_date - prev_date).days > 1:
-                            # 插入空值點讓折線斷開
-                            plot_x.append((prev_date + timedelta(days=1)).strftime('%Y-%m-%d'))
-                            plot_y.append(None)
-                    plot_x.append(curr_date.strftime('%Y-%m-%d'))
-                    plot_y.append(curr_val)
+                        prev_dt = sub_df["_dt"].iloc[i - 1]
+                        if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
+                            line_x.append((prev_dt + timedelta(days=1)).strftime('%Y-%m-%d'))
+                            line_y.append(None)
+                    line_x.append(curr_dt.strftime('%Y-%m-%d'))
+                    line_y.append(curr_val)
             else:
                 sub_x_col = active_batch_col if active_batch_col and active_batch_col in sub_df.columns else sub_df.index
                 sub_df = sub_df.sort_values(by=sub_x_col)
-                plot_x = sub_df[sub_x_col].astype(str).str.strip().tolist()
-                plot_y = sub_df["測定值"].tolist()
-                
-            sub_color = color_palette[idx % len(color_palette)]
+                marker_x = sub_df[sub_x_col].astype(str).str.strip().tolist()
+                marker_y = sub_df[val_col].tolist()
+                line_x = marker_x
+                line_y = marker_y
             
+            # 1. 畫出圓點（確保所有資料點永不消失）
             fig.add_trace(go.Scatter(
-                x=plot_x, y=plot_y,
-                mode='lines+markers',
+                x=marker_x, y=marker_y,
+                mode='markers',
+                name=f"{sub_spec}",
+                marker=dict(size=7, color=sub_color),
+                legendgroup=sub_spec
+            ))
+            # 2. 畫出線條（支援超過1天自動斷線）
+            fig.add_trace(go.Scatter(
+                x=line_x, y=line_y,
+                mode='lines',
                 name=f"{sub_spec}",
                 line=dict(color=sub_color, width=2.5),
-                marker=dict(size=7),
+                showlegend=False,
+                legendgroup=sub_spec,
                 connectgaps=False
             ))
     else:
-        # 單一項目或無取樣點時的處理
-        if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
-            clean_data = clean_data.sort_values(by="_dt")
-            plot_x = []
-            plot_y = []
-            for i in range(len(clean_data)):
-                curr_date = clean_data["_dt"].iloc[i]
-                curr_val = clean_data["測定值"].iloc[i]
+        val_col = "測定值"
+        clean_sub = clean_data.dropna(subset=[val_col]).copy()
+        if "_dt" in clean_sub.columns and clean_sub["_dt"].notna().any():
+            clean_sub = clean_sub.sort_values(by="_dt")
+            marker_x = clean_sub["_dt"].dt.strftime('%Y-%m-%d').tolist()
+            marker_y = clean_sub[val_col].tolist()
+            
+            line_x = []
+            line_y = []
+            for i in range(len(clean_sub)):
+                curr_dt = clean_sub["_dt"].iloc[i]
+                curr_val = clean_sub[val_col].iloc[i]
+                if pd.isna(curr_dt):
+                    continue
                 if i > 0:
-                    prev_date = clean_data["_dt"].iloc[i - 1]
-                    if (curr_date - prev_date).days > 1:
-                        plot_x.append((prev_date + timedelta(days=1)).strftime('%Y-%m-%d'))
-                        plot_y.append(None)
-                plot_x.append(curr_date.strftime('%Y-%m-%d'))
-                plot_y.append(curr_val)
+                    prev_dt = clean_sub["_dt"].iloc[i - 1]
+                    if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
+                        line_x.append((prev_dt + timedelta(days=1)).strftime('%Y-%m-%d'))
+                        line_y.append(None)
+                line_x.append(curr_dt.strftime('%Y-%m-%d'))
+                line_y.append(curr_val)
         else:
-            plot_x = x_labels.tolist() if hasattr(x_labels, "tolist") else list(x_labels)
-            plot_y = values.tolist() if hasattr(values, "tolist") else list(values)
+            marker_x = x_labels.tolist() if hasattr(x_labels, "tolist") else list(x_labels)
+            marker_y = values.tolist() if hasattr(values, "tolist") else list(values)
+            line_x = marker_x
+            line_y = marker_y
 
         fig.add_trace(go.Scatter(
-            x=plot_x, y=plot_y,
-            mode='lines+markers',
+            x=marker_x, y=marker_y,
+            mode='markers',
+            name=selected_param,
+            marker=dict(size=marker_sizes, color=marker_colors),
+            legendgroup="single"
+        ))
+        fig.add_trace(go.Scatter(
+            x=line_x, y=line_y,
+            mode='lines',
             name=selected_param,
             line=dict(color='#2563eb', width=2),
-            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols),
+            showlegend=False,
+            legendgroup="single",
             connectgaps=False
         ))
         
@@ -899,7 +934,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='category',  # 恢復原本整齊的類別型座標軸格式
+            type='category',
             categoryorder='array',
             categoryarray=unique_sorted_dates,
             tickfont=dict(color="#000000"),
