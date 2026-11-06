@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import date
+from datetime import date, timedelta
 
 # 1. 網頁基本設定 (寬螢幕、隱藏側邊欄)
 st.set_page_config(page_title="義芳化學品保科 - SPC 統計製程管制儀表板", layout="wide", initial_sidebar_state="collapsed")
@@ -619,8 +619,6 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
         sort_cols = ["_dt"] + ([active_batch_col] if active_batch_col is not None else [])
         clean_data = clean_data.sort_values(by=sort_cols, ascending=True).reset_index(drop=True)
         
-        # 【關鍵修改】：將 X 軸改為真實的日期時間軸類型 (type='date')
-        # 這樣當中間隔了好幾天沒有數據時，折線會自動斷開，不會被強行直線相連
         unique_sorted_dates = clean_data["_dt"].dropna().dt.strftime('%Y-%m-%d').unique().tolist()
         unique_sorted_dates.sort()
         
@@ -758,6 +756,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
+    # 【核心修正】：保持原本乾淨的類別型 X 軸格式。
+    # 針對每個取樣點，我們計算相鄰兩筆數據的日期差距：如果相隔超過 1 天（即非連續天數），
+    # 我們就在中間插入一個 `None`（空值）點，這樣 Plotly 畫圖時遇到 `None` 就會自動斷開線條，不會跨越很長一段時間硬連線！
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -775,36 +776,64 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         for idx, sub_spec in enumerate(selected_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
             sub_df = sub_df.dropna(subset=["測定值"])
-            if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
-                sub_df = sub_df.sort_values(by="_dt")
-                sub_x = sub_df["_dt"]  # 傳入 datetime 物件供 type='date' 使用
-            elif active_batch_col is not None and active_batch_col in sub_df.columns:
-                sub_df = sub_df.sort_values(by=active_batch_col)
-                sub_x = sub_df[active_batch_col].astype(str).str.strip()
-            else:
-                sub_x = sub_df.index.astype(str)
-                
             if len(sub_df) == 0:
                 continue
+                
+            if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
+                sub_df = sub_df.sort_values(by="_dt")
+                # 建立具備防呆中斷機制的資料序列：檢查相鄰日期是否連續（差值 <= 1天）
+                plot_x = []
+                plot_y = []
+                for i in range(len(sub_df)):
+                    curr_date = sub_df["_dt"].iloc[i]
+                    curr_val = sub_df["測定值"].iloc[i]
+                    if i > 0:
+                        prev_date = sub_df["_dt"].iloc[i - 1]
+                        # 如果相隔超過 1 天，插入一個帶有中間虛擬日期或 None 的斷點
+                        if (curr_date - prev_date).days > 1:
+                            # 插入空值點讓折線斷開
+                            plot_x.append((prev_date + timedelta(days=1)).strftime('%Y-%m-%d'))
+                            plot_y.append(None)
+                    plot_x.append(curr_date.strftime('%Y-%m-%d'))
+                    plot_y.append(curr_val)
+            else:
+                sub_x_col = active_batch_col if active_batch_col and active_batch_col in sub_df.columns else sub_df.index
+                sub_df = sub_df.sort_values(by=sub_x_col)
+                plot_x = sub_df[sub_x_col].astype(str).str.strip().tolist()
+                plot_y = sub_df["測定值"].tolist()
                 
             sub_color = color_palette[idx % len(color_palette)]
             
             fig.add_trace(go.Scatter(
-                x=sub_x, y=sub_df["測定值"],
+                x=plot_x, y=plot_y,
                 mode='lines+markers',
                 name=f"{sub_spec}",
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=7),
-                connectgaps=False  # 確保不連續的日期之間不會強行連線
+                connectgaps=False
             ))
     else:
+        # 單一項目或無取樣點時的處理
         if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
-            single_x = clean_data["_dt"]
+            clean_data = clean_data.sort_values(by="_dt")
+            plot_x = []
+            plot_y = []
+            for i in range(len(clean_data)):
+                curr_date = clean_data["_dt"].iloc[i]
+                curr_val = clean_data["測定值"].iloc[i]
+                if i > 0:
+                    prev_date = clean_data["_dt"].iloc[i - 1]
+                    if (curr_date - prev_date).days > 1:
+                        plot_x.append((prev_date + timedelta(days=1)).strftime('%Y-%m-%d'))
+                        plot_y.append(None)
+                plot_x.append(curr_date.strftime('%Y-%m-%d'))
+                plot_y.append(curr_val)
         else:
-            single_x = x_labels
-            
+            plot_x = x_labels.tolist() if hasattr(x_labels, "tolist") else list(x_labels)
+            plot_y = values.tolist() if hasattr(values, "tolist") else list(values)
+
         fig.add_trace(go.Scatter(
-            x=single_x, y=values,
+            x=plot_x, y=plot_y,
             mode='lines+markers',
             name=selected_param,
             line=dict(color='#2563eb', width=2),
@@ -870,10 +899,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='date',  # 【關鍵修改】：改為日期型態軸，讓未檢驗的空檔自動依時間比例斷開，不再強行直線連接
+            type='category',  # 恢復原本整齊的類別型座標軸格式
+            categoryorder='array',
+            categoryarray=unique_sorted_dates,
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
+            nticks=30,
             showline=True,
             linewidth=1,
             linecolor='black',
