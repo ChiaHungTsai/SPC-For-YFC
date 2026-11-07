@@ -612,23 +612,17 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
-    # 【絕對強制全局時間排序】：在任何子資料切割前，先對整個 clean_data 做嚴格的 Datetime 升冪排序
     if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
         clean_data = clean_data.dropna(subset=["_dt"]).copy()
         clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
-        
-        # 關鍵：生成絕對按時間先後排序的唯一日期字串陣列
-        unique_sorted_dates = clean_data["_dt"].dt.strftime('%Y-%m-%d').drop_duplicates().tolist()
         xaxis_title_text = "日期"
     else:
-        unique_sorted_dates = []
         xaxis_title_text = "日期"
 else:
     clean_data = pd.DataFrame()
     decimal_places = 2
     fmt_str = "{:.2f}"
     plotly_fmt = ".2f"
-    unique_sorted_dates = []
     xaxis_title_text = "日期"
 
 if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
@@ -749,6 +743,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
+    # 【完美解決方案】：直接採用 type='date' 時間軸，並利用 tickformat 強制顯示為你原本的日期格式 (YYYY-MM-DD)。
+    # 這樣 Plotly 會 100% 自動依照真實時間先後順序排列，且不需要手動拼湊類別陣列，從根源徹底解決排序錯亂！
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -792,7 +788,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     else:
                         m_col, m_sym, m_sz = sub_color, 'circle', 6
                         
-                    marker_x.append(curr_dt.strftime('%Y-%m-%d'))
+                    marker_x.append(curr_dt)
                     marker_y.append(curr_val)
                     marker_colors_sub.append(m_col)
                     marker_symbols_sub.append(m_sym)
@@ -801,9 +797,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     if i > 0:
                         prev_dt = sub_df["_dt"].iloc[i - 1]
                         if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
-                            line_x.append((prev_dt + timedelta(days=1)).strftime('%Y-%m-%d'))
+                            line_x.append(prev_dt + timedelta(days=1))
                             line_y.append(None)
-                    line_x.append(curr_dt.strftime('%Y-%m-%d'))
+                    line_x.append(curr_dt)
                     line_y.append(curr_val)
             else:
                 continue
@@ -837,14 +833,14 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 if i > 0:
                     prev_dt = clean_data["_dt"].iloc[i - 1]
                     if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
-                        line_x.append((prev_dt + timedelta(days=1)).strftime('%Y-%m-%d'))
+                        line_x.append(prev_dt + timedelta(days=1))
                         line_y.append(None)
-                line_x.append(curr_dt.strftime('%Y-%m-%d'))
+                line_x.append(curr_dt)
                 line_y.append(curr_val)
-                marker_x.append(curr_dt.strftime('%Y-%m-%d'))
+                marker_x.append(curr_dt)
                 marker_y.append(curr_val)
         else:
-            marker_x = clean_data.index.astype(str).tolist()
+            marker_x = clean_data.index.tolist()
             marker_y = clean_data["測定值"].tolist()
             line_x = marker_x
             line_y = marker_y
@@ -924,9 +920,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='category',
-            categoryorder='array',
-            categoryarray=unique_sorted_dates,  # 使用全域嚴格按時間先後排序的日期陣列
+            type='date',  # 採用真正的時間軸型態，並透過 tickformat 呈現標準格式
+            tickformat='%Y-%m-%d',
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
