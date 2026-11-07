@@ -236,9 +236,9 @@ def load_and_preprocess_data(url):
         if limit_col in temp_df.columns:
             temp_df[limit_col] = pd.to_numeric(temp_df[limit_col], errors='coerce')
             
-    # 【全面強化】：在資料載入時就直接將檢驗日期轉為標準 datetime 物件，並建立全域排序列
+    # 【全面強化日期解析】：使用 format='mixed' 確保所有格式一致的日期字串被精確轉為 Datetime
     if "檢驗日期" in temp_df.columns:
-        temp_df["_dt"] = pd.to_datetime(temp_df["檢驗日期"], errors='coerce')
+        temp_df["_dt"] = pd.to_datetime(temp_df["檢驗日期"], format='mixed', errors='coerce')
     else:
         temp_df["_dt"] = pd.NaT
             
@@ -613,13 +613,13 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
-    # 【絕對修復日期排序】：過濾掉無效日期後，依 _dt 進行嚴格的時間升冪排序
+    # 【絕對修復排序邏輯】：先轉為 datetime，濾除 NaT，再嚴格依時間升冪排序，並產生唯一有序日期清單
     if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
         clean_data = clean_data.dropna(subset=["_dt"]).copy()
         sort_cols = ["_dt"] + ([active_batch_col] if active_batch_col is not None else [])
         clean_data = clean_data.sort_values(by=sort_cols, ascending=True).reset_index(drop=True)
         
-        # 嚴格按 Datetime 時間先後順序產生唯一日期陣列
+        # 嚴格依照 Datetime 排序後去重，保證時間先後順序 100% 正確
         unique_sorted_dates = clean_data["_dt"].sort_values().dt.strftime('%Y-%m-%d').drop_duplicates().tolist()
         
         x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d')
@@ -750,7 +750,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 2. 管制圖標題
+    # 2. 管制圖標題 (包含製造單位與製程階段)
     chart_title_html = f"""
     <div class="highlight-title-box">
         {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
