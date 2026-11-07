@@ -615,12 +615,12 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     if active_batch_col is not None:
         clean_data["_x_val"] = clean_data[active_batch_col].astype(str).str.strip()
 
+    # 【絕對修復】：以 _dt 物件進行全域時間升冪排序，並強制依 Datetime 時間先後順序產生唯一日期陣列
     if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
-        sort_cols = ["_dt"] + ([active_batch_col] if active_batch_col is not None else [])
-        clean_data = clean_data.sort_values(by=sort_cols, ascending=True).reset_index(drop=True)
+        clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
         
-        # 【關鍵修復】：確保唯一日期清單是先以真實的 Datetime 進行升冪排序後，才轉成字串陣列
-        unique_sorted_dates = clean_data["_dt"].dropna().drop_duplicates().sort_values().dt.strftime('%Y-%m-%d').tolist()
+        # 嚴格依照 Datetime 排序後再轉字串，防止字串排序導致月份錯亂
+        unique_sorted_dates = clean_data["_dt"].dropna().sort_values().dt.strftime('%Y-%m-%d').drop_duplicates().tolist()
         
         x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d').fillna(clean_data.index.to_series().astype(str))
         xaxis_title_text = "日期"
@@ -783,7 +783,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             sub_color = color_palette[idx % len(color_palette)]
             
             if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
-                sub_df = sub_df.sort_values(by="_dt")
+                sub_df = sub_df.sort_values(by="_dt", ascending=True)
                 line_x, line_y = [], []
                 marker_x, marker_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
                 
@@ -852,7 +852,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             ))
     else:
         if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
-            clean_data = clean_data.sort_values(by="_dt")
+            clean_data = clean_data.sort_values(by="_dt", ascending=True)
             line_x, line_y = [], []
             marker_x, marker_y = [], []
             for i in range(len(clean_data)):
@@ -952,7 +952,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         xaxis=dict(
             type='category',
             categoryorder='array',
-            categoryarray=unique_sorted_dates,
+            categoryarray=unique_sorted_dates,  # 嚴格依照 Datetime 升冪排序後的時間陣列
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
