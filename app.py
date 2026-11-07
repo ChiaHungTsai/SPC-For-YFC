@@ -642,6 +642,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
         unique_batches = []
     else:
         if active_batch_col is not None:
+            # 【關鍵修復】：確保全域 clean_data 先依照批號結尾數字大小進行全局排序
             clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True).reset_index(drop=True)
             unique_batches = clean_data[active_batch_col].astype(str).str.strip().drop_duplicates().tolist()
             xaxis_title_text = active_batch_col
@@ -804,6 +805,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_sizes_sub.append(m_sz)
             else:
                 if active_batch_col is not None:
+                    # 確保子區塊也同樣依照 batch_sort_key 嚴格排序
                     sub_df = sub_df.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True)
                     plot_x = sub_df[active_batch_col].astype(str).str.strip().tolist()
                 else:
