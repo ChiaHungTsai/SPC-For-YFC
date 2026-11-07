@@ -509,7 +509,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇 ====================
+# ==================== 5. 檢驗日期區間選擇 (僅在非凡立水課或有日期時顯示) ====================
 today = date.today()
 current_year = today.year
 
@@ -528,7 +528,9 @@ if "end_date" not in st.session_state:
 if st.session_state["start_date"] > st.session_state["end_date"]:
     st.session_state["start_date"] = st.session_state["end_date"]
 
-has_valid_dates = "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
+# 【規則判定】：凡立水課的 IPQC、FQC、OQC 強制使用批號，不顯示日期篩選區間
+is_fanlishui_batch_mode = (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"])
+has_valid_dates = not is_fanlishui_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
     cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
@@ -612,9 +614,11 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
-    use_date_axis = has_valid_dates and clean_data["_dt"].notna().any()
+    # 【核心邏輯判定】：若為凡立水課的 IPQC/FQC/OQC，強制使用批號軸 (`use_date_axis = False`)
+    use_date_axis = has_valid_dates and not is_fanlishui_batch_mode and clean_data["_dt"].notna().any()
 
     if use_date_axis:
+        clean_data = clean_data.dropna(subset=["_dt"]).copy()
         clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
         xaxis_title_text = "日期"
     else:
@@ -912,7 +916,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="x unified",  # 【關鍵修正】：無論是時間軸或批號類別軸，全面強制啟用 'x unified'，讓游標移到 X 軸位置時自動聚合顯示該位置的所有數值
+        hovermode="x unified",
         hoverlabel=dict(
             align="left"
         ),
