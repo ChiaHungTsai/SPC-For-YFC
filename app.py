@@ -635,10 +635,8 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 產生絕對正確排序的唯一批號列表
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
-            # 【關鍵還原】：改回以類別名稱（批號字串本身）作為 X 軸，並強制定為 Categorical
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
             clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
             
@@ -822,7 +820,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 x=plot_x, y=plot_y,
                 mode='lines+markers',
                 name=f"{sub_spec}",
-                hovertemplate="<b>%{x}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
+                # 【關鍵修改】：利用 hovertemplate 隱藏頂端預設標題，並將批號移到下方或自訂格式
+                hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
                 connectgaps=False
@@ -884,8 +883,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             x=plot_x, y=plot_y,
             mode='lines+markers',
             name=selected_param,
-            # 【關鍵優化】：改用 %{x} 顯示批號名稱，完美取代上方原本的數字索引
-            hovertemplate="<b>%{x}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
+            # 【關鍵修改】：利用 hovertemplate 隱藏頂端預設標題，只保留數值，並把 X 軸標籤（批號）移至最上方當標題或隱藏
+            hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
             line=dict(color='#2563eb', width=2),
             marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
             connectgaps=False
@@ -937,9 +936,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="x unified",  # 【恢復為 x unified】：滑鼠移到任意 X 軸位置整條垂直顯示，靈敏度極佳
+        hovermode="x unified",
         hoverlabel=dict(
-            align="left"
+            align="left",
+            namelength=0  # 【關鍵修改】：將懸停標題的名稱長度設為 0，徹底隱藏頂端的 X 軸數值或批號標題
         ),
         margin=dict(l=60, r=40, t=50, b=80),
         legend=dict(
@@ -951,7 +951,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         xaxis=dict(
             type='date' if use_date_axis else 'category',
             categoryorder='array' if not use_date_axis else None,
-            categoryarray=unique_batches if not use_date_axis else None,  # 強制鎖定排好序的批號陣列
+            categoryarray=unique_batches if not use_date_axis else None,
             tickformat='%Y-%m-%d' if use_date_axis else None,
             tickfont=dict(color="#000000", size=10),
             title_font=dict(color="#000000"),
