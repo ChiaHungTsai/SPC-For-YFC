@@ -719,8 +719,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 採用標準 time series (type='date')，同時將點與線合併在同一個 Trace 內 (`mode='lines+markers'`)，
-    # 確保圖例只有一個、不產生額外的 X 或 點的圖例標示，且時間絕對依照先後順序完美排列。
+    # 採用 type='date' 確保時間軸絕對正確，並且在處理斷線時，對應的 marker 屬性同步 append(None)，完美解決 ValueError
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -758,9 +757,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
                             plot_x.append(prev_dt + timedelta(days=1))
                             plot_y.append(None)
-                            marker_colors_sub.append(None)
-                            marker_symbols_sub.append(None)
-                            marker_sizes_sub.append(None)
+                            marker_colors_sub.append('#00000000')  # 透明或不畫點
+                            marker_symbols_sub.append('circle')
+                            marker_sizes_sub.append(0)
                     
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                     is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
@@ -804,9 +803,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
                         plot_x.append(prev_dt + timedelta(days=1))
                         plot_y.append(None)
-                        marker_colors_list.append(None)
-                        marker_symbols_list.append(None)
-                        marker_sizes_list.append(None)
+                        marker_colors_list.append('#00000000')
+                        marker_symbols_list.append('circle')
+                        marker_sizes_list.append(0)
                 
                 is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                 is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
