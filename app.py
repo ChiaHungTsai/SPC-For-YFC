@@ -249,16 +249,22 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 【萬無一失版】批號結尾數字萃取與排序函數 ====================
+# ==================== 【終極強化版】批號結尾數字精準排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
-    # 直接抓取結尾或 G 後面的數字（適用於 XA08G007、IDI01032AC 等格式）
+    # 針對 XA08G007 這種格式：抓取英文字母最後一個字元（如 G 或 E 等）後方的所有數字
+    match = re.search(r'[A-Za-z](\d+)$', s_str)
+    if match:
+        try:
+            return (0, int(match.group(1)), s_str)
+        except ValueError:
+            pass
+    # 備用：抓取字串中所有的數字，取最後一組
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
-            val = int(digits[-1])
-            return (0, val, s_str)
+            return (0, int(digits[-1]), s_str)
         except ValueError:
             pass
     return (1, 0, s_str)
@@ -637,10 +643,10 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 【關鍵解法】：透過 Python 內建 sorted 配合 batch_sort_key 產生唯一且完美排序的批號陣列
+            # 【強制精準排序】：透過 sorted 配合 batch_sort_key 產生正確排序的唯一批號清單
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
-            # 將 DataFrame 依照這個排好序的清單順序重新建立 Categorical 類別，並原地重新排序
+            # 將資料表依照這個清單設定成 Categorical，並強制重新排序
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
             clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
             
@@ -804,8 +810,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_sizes_sub.append(m_sz)
             else:
                 if active_batch_col is not None:
-                    # 直接沿用已在全域排好序的 categorical 順序
-                    plot_x = sub_df[active_batch_col].astype(str).tolist()
+                    # 確保子區塊也嚴格依照 unique_batches 的索引進行對齊與排序
+                    sub_df[active_batch_col] = sub_df[active_batch_col].astype(str).str.strip()
+                    sub_df['__sort_idx'] = sub_df[active_batch_col].map(lambda x: unique_batches.index(x) if x in unique_batches else 999999)
+                    sub_df = sub_df.sort_values(by='__sort_idx').drop(columns=['__sort_idx'])
+                    plot_x = sub_df[active_batch_col].tolist()
                 else:
                     plot_x = sub_df.index.astype(str).tolist()
                 
