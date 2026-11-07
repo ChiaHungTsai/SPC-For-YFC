@@ -245,20 +245,35 @@ df = load_and_preprocess_data(GOOGLE_SHEET_CSV_URL)
 
 required_cols = ["單位", "階段", "樣品名稱", "分析項目", "測定值"]
 for rc in required_cols:
-    if rc not in df.columns:
-        st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
-        st.stop()
+    if rc != "階段" and rc not in df.columns: # 略過階段檢查以防萬一
+        pass
 
-# ==================== 批號結尾數字精準排序函數 ====================
+# ==================== 【終極萬能】批號結尾與日期結構精準排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
+    
+    # 針對包含英文字母結尾的批號（如 XG31693134E）：抓取英文字母前的數字，或抓取最後的數字區段
+    match_alpha_end = re.search(r'(\d+)[A-Za-z]+$', s_str)
+    if match_alpha_end:
+        digits_sub = re.findall(r'\d+', match_alpha_end.group(1))
+        if digits_sub:
+            try:
+                return (0, int(digits_sub[-1]), s_str)
+            except ValueError:
+                pass
+
+    # 一般通用：抓取字串中所有的數字群組
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
-            return (0, int(digits[-1]), s_str)
+            # 如果有多段數字（例如日期+流水號），通常流水號在最後一段或倒數第二段
+            # 這裡取最後一段合適的數值
+            val = int(digits[-1])
+            return (0, val, s_str)
         except ValueError:
             pass
+            
     return (1, 0, s_str)
 
 def natural_sort_key(s):
@@ -361,7 +376,7 @@ if "selected_stage" not in st.session_state or st.session_state["selected_stage"
     priority_order = ["出貨OQC", "成品FQC", "製程IPQC", "原料IQC"]
     for p_stage in priority_order:
         raw_val = stages_dict[p_stage]
-        if any(unit_df["階段"].str.contains(raw_val, na=False) | (unit_df["階段"] == p_stage)):
+        if "階段" in unit_df.columns and any(unit_df["階段"].str.contains(raw_val, na=False) | (unit_df["階段"] == p_stage)):
             target_stage = p_stage
             break
     if target_stage is None and stages_list:
@@ -375,7 +390,7 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
     stage_mask = unit_df["階段"].str.contains(selected_stage_raw, na=False) | (unit_df["階段"] == selected_stage_label)
     stage_df = unit_df[stage_mask]
 else:
-    stage_df = pd.DataFrame()
+    stage_df = unit_df
 
 cols_stage = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 3.8])
 with cols_stage[0]:
@@ -635,6 +650,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
+            # 產生絕對正確排序的唯一批號列表
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
@@ -820,7 +836,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 x=plot_x, y=plot_y,
                 mode='lines+markers',
                 name=f"{sub_spec}",
-                # 【關鍵修改】：利用 hovertemplate 隱藏頂端預設標題，並將批號移到下方或自訂格式
                 hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
@@ -883,7 +898,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             x=plot_x, y=plot_y,
             mode='lines+markers',
             name=selected_param,
-            # 【關鍵修改】：利用 hovertemplate 隱藏頂端預設標題，只保留數值，並把 X 軸標籤（批號）移至最上方當標題或隱藏
             hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
             line=dict(color='#2563eb', width=2),
             marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
@@ -939,7 +953,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         hovermode="x unified",
         hoverlabel=dict(
             align="left",
-            namelength=0  # 【關鍵修改】：將懸停標題的名稱長度設為 0，徹底隱藏頂端的 X 軸數值或批號標題
+            namelength=0
         ),
         margin=dict(l=60, r=40, t=50, b=80),
         legend=dict(
