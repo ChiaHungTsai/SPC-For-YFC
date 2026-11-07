@@ -642,7 +642,6 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
         unique_batches = []
     else:
         if active_batch_col is not None:
-            # 【關鍵修復】：確保全域 clean_data 先依照批號結尾數字大小進行全局排序
             clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True).reset_index(drop=True)
             unique_batches = clean_data[active_batch_col].astype(str).str.strip().drop_duplicates().tolist()
             xaxis_title_text = active_batch_col
@@ -805,9 +804,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_sizes_sub.append(m_sz)
             else:
                 if active_batch_col is not None:
-                    # 確保子區塊也同樣依照 batch_sort_key 嚴格排序
-                    sub_df = sub_df.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True)
-                    plot_x = sub_df[active_batch_col].astype(str).str.strip().tolist()
+                    # 【核心修正】：嚴格按照全域唯一的有序批號清單（unique_batches）來對齊與排序子區塊，保證多規格順序 100% 一致
+                    sub_df[active_batch_col] = sub_df[active_batch_col].astype(str).str.strip()
+                    sub_df['__sort_idx'] = sub_df[active_batch_col].map(lambda x: unique_batches.index(x) if x in unique_batches else 999999)
+                    sub_df = sub_df.sort_values(by='__sort_idx').drop(columns=['__sort_idx'])
+                    plot_x = sub_df[active_batch_col].tolist()
                 else:
                     plot_x = sub_df.index.astype(str).tolist()
                 
@@ -868,7 +869,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 marker_sizes_list.append(m_sz)
         else:
             if active_batch_col is not None:
-                clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True)
                 plot_x = clean_data[active_batch_col].astype(str).str.strip().tolist()
             else:
                 plot_x = clean_data.index.astype(str).tolist()
