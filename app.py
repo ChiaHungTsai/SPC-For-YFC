@@ -828,7 +828,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 mode='lines+markers',
                 name=f"{sub_spec}",
                 customdata=customdata_sub,
-                hovertemplate="批號: <b>%{customdata}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
+                hovertemplate="<b>%{customdata}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
                 connectgaps=False
@@ -897,7 +897,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             mode='lines+markers',
             name=selected_param,
             customdata=customdata_list,
-            # 【關鍵修復】：將 hovertemplate 內最上方的數字移除，改由粗體批號完全取代
             hovertemplate="<b>%{customdata}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
             line=dict(color='#2563eb', width=2),
             marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
@@ -977,7 +976,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="x unified",
+        hovermode="closest",  # 【關鍵修復】：改為 'closest' 模式，徹底消滅聯合懸停頂端的數字索引
         hoverlabel=dict(
             align="left"
         ),
