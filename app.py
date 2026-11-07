@@ -49,7 +49,6 @@ st.markdown("""
         line-height: 1.2;
     }
     
-    /* 讓 multiselect 下拉選單支援捲動並加上核取方框視覺優化 */
     div[data-baseweb="popover"] {
         width: max-content !important;
         min-width: 280px !important;
@@ -118,7 +117,6 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 統一所有下方按鈕的大小與高度 (36px) */
     .stButton > button {
         width: 100% !important;
         height: 36px !important;
@@ -721,10 +719,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 【最終完美修正】：
-    # 1. 點和線合併在同一個 Trace 中 (mode='lines+markers')，圖例乾淨唯一、無多餘標示。
-    # 2. X 軸採用 type='date' 配合 tickformat='%Y-%m-%d'，由 Plotly 自動精確控制時間先後順序，絕不發生日期倒置。
-    # 3. 透過 customdata 與 hovertemplate 精準顯示規格違規（❌）與管制違規（●），不干擾圖例與主線。
+    # 採用標準 time series (type='date')，同時將點與線合併在同一個 Trace 內 (`mode='lines+markers'`)，
+    # 確保圖例只有一個、不產生額外的 X 或 點的圖例標示，且時間絕對依照先後順序完美排列。
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -899,8 +895,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='date',  # 採用標準時間軸型態，保證排序絕對正確無誤
-            tickformat='%Y-%m-%d',  # 完美維持你熟悉的日期格式
+            type='date',  # 採用標準時間軸，完美解決日期排序錯亂問題
+            tickformat='%Y-%m-%d',  # 維持標準日期格式
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
