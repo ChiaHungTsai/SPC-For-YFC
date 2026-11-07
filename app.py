@@ -612,13 +612,13 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
-    # 【絕對修復順序與格式】：先將有效資料濾出，全域依照 _dt 進行嚴格的 Datetime 升冪排序
+    # 【絕對修復】：先以 _dt 物件嚴格按時間升冪排序，再安全萃取 `unique_sorted_dates`
     if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
         clean_data = clean_data.dropna(subset=["_dt"]).copy()
         clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
         
-        # 建立全局絕對不重複且按時間先後排序的日期字串陣列（作為類別軸順序依據）
-        unique_sorted_dates = clean_data["_dt"].dt.strftime('%Y-%m-%d').drop_duplicates().tolist()
+        # 關鍵：先對 _dt 進行排序，再轉成字串，確保陣列順序絕對符合時間先後
+        unique_sorted_dates = clean_data["_dt"].sort_values().dt.strftime('%Y-%m-%d').drop_duplicates().tolist()
         xaxis_title_text = "日期"
     else:
         unique_sorted_dates = []
@@ -676,15 +676,15 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         is_ctrl_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
         
         if is_spec_violate:
-            marker_colors.append('#dc2626')
-            marker_symbols.append('x')
+            marker_colors.append('#dc2626')   # 紅色
+            marker_symbols.append('x')        # 規格違規用交叉
             marker_sizes.append(10)
         elif is_ctrl_violate:
-            marker_colors.append('#f97316')
-            marker_symbols.append('circle')
+            marker_colors.append('#f97316')   # 橘色
+            marker_symbols.append('circle')   # 管制違規用圓點
             marker_sizes.append(8)
         else:
-            marker_colors.append('#2563eb')
+            marker_colors.append('#2563eb')   # 藍色正常點
             marker_symbols.append('circle')
             marker_sizes.append(6)
 
@@ -926,7 +926,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         xaxis=dict(
             type='category',
             categoryorder='array',
-            categoryarray=unique_sorted_dates,  # 使用全域嚴格按時間先後排序的日期陣列
+            categoryarray=unique_sorted_dates,  # 已確保完全依 Datetime 時間先後嚴格升冪排序
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
