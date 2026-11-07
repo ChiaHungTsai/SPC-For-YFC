@@ -635,11 +635,12 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
+            # 產生絕對正確排序的唯一批號列表
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
-            batch_to_idx = {batch: idx for idx, batch in enumerate(unique_batches)}
-            clean_data['_x_num_idx'] = clean_data[active_batch_col].map(batch_to_idx)
-            clean_data = clean_data.sort_values(by='_x_num_idx').reset_index(drop=True)
+            # 【關鍵還原】：改回以類別名稱（批號字串本身）作為 X 軸，並強制定為 Categorical
+            clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
+            clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
             
             xaxis_title_text = active_batch_col
         else:
@@ -768,12 +769,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             if use_date_axis:
                 sub_df = sub_df.sort_values(by="_dt", ascending=True)
                 plot_x, plot_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
-                customdata_sub = []
                 
                 for i in range(len(sub_df)):
                     curr_dt = sub_df["_dt"].iloc[i]
                     curr_val = sub_df["測定值"].iloc[i]
-                    curr_batch = sub_df[active_batch_col].iloc[i] if active_batch_col else ""
                     if pd.isna(curr_dt):
                         continue
                     
@@ -785,7 +784,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                             marker_colors_sub.append('#00000000')
                             marker_symbols_sub.append('circle')
                             marker_sizes_sub.append(0)
-                            customdata_sub.append("")
                     
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                     is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
@@ -802,14 +800,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_colors_sub.append(m_col)
                     marker_symbols_sub.append(m_sym)
                     marker_sizes_sub.append(m_sz)
-                    customdata_sub.append(curr_batch)
             else:
                 if active_batch_col is not None:
-                    plot_x = sub_df['_x_num_idx'].tolist()
-                    customdata_sub = sub_df[active_batch_col].tolist()
+                    plot_x = sub_df[active_batch_col].astype(str).tolist()
                 else:
-                    plot_x = sub_df.index.tolist()
-                    customdata_sub = ["" ] * len(sub_df)
+                    plot_x = sub_df.index.astype(str).tolist()
                 
                 plot_y = sub_df["測定值"].tolist()
                 marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], []
@@ -827,8 +822,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 x=plot_x, y=plot_y,
                 mode='lines+markers',
                 name=f"{sub_spec}",
-                customdata=customdata_sub,
-                hovertemplate="<b>%{customdata}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
+                hovertemplate="<b>%{x}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
                 connectgaps=False
@@ -838,12 +832,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             clean_data = clean_data.sort_values(by="_dt", ascending=True)
             plot_x, plot_y = [], []
             marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
-            customdata_list = []
             
             for i in range(len(clean_data)):
                 curr_dt = clean_data["_dt"].iloc[i]
                 curr_val = clean_data["測定值"].iloc[i]
-                curr_batch = clean_data[active_batch_col].iloc[i] if active_batch_col else ""
                 if pd.isna(curr_dt):
                     continue
                 if i > 0:
@@ -854,7 +846,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         marker_colors_list.append('#00000000')
                         marker_symbols_list.append('circle')
                         marker_sizes_list.append(0)
-                        customdata_list.append("")
                 
                 is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                 is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
@@ -871,14 +862,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 marker_colors_list.append(m_col)
                 marker_symbols_list.append(m_sym)
                 marker_sizes_list.append(m_sz)
-                customdata_list.append(curr_batch)
         else:
             if active_batch_col is not None:
-                plot_x = clean_data['_x_num_idx'].tolist()
-                customdata_list = clean_data[active_batch_col].tolist()
+                plot_x = clean_data[active_batch_col].astype(str).tolist()
             else:
-                plot_x = clean_data.index.tolist()
-                customdata_list = ["" ] * len(clean_data)
+                plot_x = clean_data.index.astype(str).tolist()
             
             plot_y = clean_data["測定值"].tolist()
             marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
@@ -896,8 +884,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             x=plot_x, y=plot_y,
             mode='lines+markers',
             name=selected_param,
-            customdata=customdata_list,
-            hovertemplate="<b>%{customdata}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
+            # 【關鍵優化】：改用 %{x} 顯示批號名稱，完美取代上方原本的數字索引
+            hovertemplate="<b>%{x}</b><br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
             line=dict(color='#2563eb', width=2),
             marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
             connectgaps=False
@@ -942,33 +930,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             annotation_position="bottom right"
         )
 
-    # X 軸刻度與間距配置
-    xaxis_config = dict(
-        type='date' if use_date_axis else 'linear',
-        tickfont=dict(color="#000000", size=10),
-        title_font=dict(color="#000000"),
-        tickangle=-45,
-        showline=True,
-        linewidth=1,
-        linecolor='black',
-        mirror=True,
-        showspikes=True,
-        spikemode="across",
-        spikesnap="cursor",
-        spikethickness=1,
-        spikecolor="black",
-        spikedash="dash"
-    )
-    
-    if not use_date_axis and len(unique_batches) > 0:
-        total_b = len(unique_batches)
-        step = max(1, total_b // 25)
-        xaxis_config.update(
-            tickmode='array',
-            tickvals=list(range(total_b))[::step],
-            ticktext=[unique_batches[i] for i in range(total_b)][::step]
-        )
-
     fig.update_layout(
         title=dict(text="", font=dict(color="#000000", size=1)),
         xaxis_title=dict(text=xaxis_title_text, font=dict(color="#000000", size=12)),
@@ -976,7 +937,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="closest",  # 【關鍵修復】：改為 'closest' 模式，徹底消滅聯合懸停頂端的數字索引
+        hovermode="x unified",  # 【恢復為 x unified】：滑鼠移到任意 X 軸位置整條垂直顯示，靈敏度極佳
         hoverlabel=dict(
             align="left"
         ),
@@ -987,7 +948,26 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             bordercolor="#000000",
             borderwidth=1
         ),
-        xaxis=xaxis_config,
+        xaxis=dict(
+            type='date' if use_date_axis else 'category',
+            categoryorder='array' if not use_date_axis else None,
+            categoryarray=unique_batches if not use_date_axis else None,  # 強制鎖定排好序的批號陣列
+            tickformat='%Y-%m-%d' if use_date_axis else None,
+            tickfont=dict(color="#000000", size=10),
+            title_font=dict(color="#000000"),
+            tickangle=-45,
+            nticks=30,
+            showline=True,
+            linewidth=1,
+            linecolor='black',
+            mirror=True,
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikethickness=1,
+            spikecolor="black",
+            spikedash="dash"
+        ),
         yaxis=dict(
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
