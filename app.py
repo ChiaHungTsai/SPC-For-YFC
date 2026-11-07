@@ -249,19 +249,14 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 批號專屬排序函數（優先比對最後3位數字大小） ====================
+# ==================== 批號專屬排序函數（精準萃取結尾數字大小） ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
-    # 萃取字串中的所有數字群組
     digits = re.findall(r'\d+', s_str)
     if digits:
-        # 取最後一個數字群組作為結尾數值進行數值比對
-        last_digits = digits[-1]
-        # 為了安全比對，將結尾轉為整數，其餘部分作為次要排序
         try:
-            val = int(last_digits)
-            # 如果這組數字剛好是最後 3 位或是整體結尾，賦予最高權重
+            val = int(digits[-1])  # 抓取批號結尾的純數字進行數值比對
             return (0, val, s_str)
         except ValueError:
             pass
@@ -637,13 +632,15 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
         clean_data = clean_data.dropna(subset=["_dt"]).copy()
         clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
         xaxis_title_text = "日期"
+        unique_batches = []
     else:
         if active_batch_col is not None:
-            # 【核心修復】：依據批號最後 3 位數字大小進行升冪排序
             clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True).reset_index(drop=True)
+            unique_batches = clean_data[active_batch_col].astype(str).str.strip().drop_duplicates().tolist()
             xaxis_title_text = active_batch_col
         else:
             clean_data = clean_data.reset_index(drop=True)
+            unique_batches = []
             xaxis_title_text = "序號"
 else:
     clean_data = pd.DataFrame()
@@ -653,6 +650,7 @@ else:
     xaxis_title_text = "日期"
     use_date_axis = False
     active_batch_col = None
+    unique_batches = []
 
 if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
     values = clean_data["測定值"]
@@ -799,7 +797,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_sizes_sub.append(m_sz)
             else:
                 if active_batch_col is not None:
-                    # 批號模式下依據結尾 3 位數字大小排序
                     sub_df = sub_df.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True)
                     plot_x = sub_df[active_batch_col].astype(str).str.strip().tolist()
                 else:
@@ -947,6 +944,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         ),
         xaxis=dict(
             type='date' if use_date_axis else 'category',
+            categoryorder='array' if not use_date_axis else None,
+            categoryarray=unique_batches if not use_date_axis else None,  # 【關鍵修復】：強制綁定排好序的批號陣列
             tickformat='%Y-%m-%d' if use_date_axis else None,
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
