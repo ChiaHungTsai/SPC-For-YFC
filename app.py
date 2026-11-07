@@ -249,14 +249,21 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 批號專屬排序函數（精準萃取結尾數字大小） ====================
+# ==================== 批號專屬排序函數（絕對精準抓取結尾數字） ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
+    match = re.search(r'(\d+)[A-Za-z]*$', s_str)
+    if match:
+        try:
+            val = int(match.group(1))
+            return (0, val, s_str)
+        except ValueError:
+            pass
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
-            val = int(digits[-1])  # 抓取批號結尾的純數字進行數值比對
+            val = int(digits[-1])
             return (0, val, s_str)
         except ValueError:
             pass
@@ -945,7 +952,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         xaxis=dict(
             type='date' if use_date_axis else 'category',
             categoryorder='array' if not use_date_axis else None,
-            categoryarray=unique_batches if not use_date_axis else None,  # 【關鍵修復】：強制綁定排好序的批號陣列
+            categoryarray=unique_batches if not use_date_axis else None,
             tickformat='%Y-%m-%d' if use_date_axis else None,
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
