@@ -249,7 +249,7 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 【萬無一失版】批號結尾數字萃取排序函數 ====================
+# ==================== 批號結尾數字精準排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
@@ -635,15 +635,12 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 【終極解法】：直接透過 Python 內建 sorted 配合 batch_sort_key 產生絕對有序的唯一批號列表
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
-            # 【關鍵強制重建】：建立一個對照字典，將每個批號對應到一個「純整數索引 (0, 1, 2, 3...)」
             batch_to_idx = {batch: idx for idx, batch in enumerate(unique_batches)}
             clean_data['_x_num_idx'] = clean_data[active_batch_col].map(batch_to_idx)
-            
-            # 依據數值索引進行絕對強制全域排序
             clean_data = clean_data.sort_values(by='_x_num_idx').reset_index(drop=True)
+            
             xaxis_title_text = active_batch_col
         else:
             clean_data = clean_data.reset_index(drop=True)
@@ -804,7 +801,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_sizes_sub.append(m_sz)
             else:
                 if active_batch_col is not None:
-                    # 【數字座標軸強制對齊】：直接提取整數索引位置（0, 1, 2...）
                     plot_x = sub_df['_x_num_idx'].tolist()
                 else:
                     plot_x = sub_df.index.tolist()
@@ -930,10 +926,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             annotation_position="bottom right"
         )
 
-    # 【終極刻度強制對應設定】
+    # 【X 軸刻度與間距終極優化設定】
     xaxis_config = dict(
         type='date' if use_date_axis else 'linear',
-        tickfont=dict(color="#000000"),
+        tickfont=dict(color="#000000", size=10),
         title_font=dict(color="#000000"),
         tickangle=-45,
         showline=True,
@@ -949,10 +945,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     )
     
     if not use_date_axis and len(unique_batches) > 0:
+        total_b = len(unique_batches)
+        # 依據批號總數動態計算合適的刻度間距 (dtick)，避免文字過密重疊
+        step = max(1, total_b // 25)  # 畫面大約最多顯示 25 個主要刻度標籤
         xaxis_config.update(
             tickmode='array',
-            tickvals=list(range(len(unique_batches))),
-            ticktext=unique_batches
+            tickvals=list(range(total_b))[::step],
+            ticktext=[unique_batches[i] for i in range(total_b)][::step]
         )
 
     fig.update_layout(
@@ -966,7 +965,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         hoverlabel=dict(
             align="left"
         ),
-        margin=dict(l=60, r=40, t=50, b=50),
+        margin=dict(l=60, r=40, t=50, b=80),
         legend=dict(
             y=0.5,
             yanchor="middle",
