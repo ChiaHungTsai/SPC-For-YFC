@@ -719,7 +719,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 採用 type='date' 確保時間軸絕對正確，並且在處理斷線時，對應的 marker 屬性同步 append(None)，完美解決 ValueError
+    # 【關鍵修正】：將 hovermode 從 'x unified' 改為 'closest'。
+    # 這樣滑鼠指過去時，只會顯示該天實際有數據的曲線數值，不會在沒有數據的日期強行顯示其他曲線的舊數據！
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -757,7 +758,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
                             plot_x.append(prev_dt + timedelta(days=1))
                             plot_y.append(None)
-                            marker_colors_sub.append('#00000000')  # 透明或不畫點
+                            marker_colors_sub.append('#00000000')
                             marker_symbols_sub.append('circle')
                             marker_sizes_sub.append(0)
                     
@@ -882,7 +883,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="x unified",
+        hovermode="closest",  # 修改此處：改為 'closest'，讓滑鼠只顯示點擊或真正有數據當下的數值，不會在沒有數據的位置強行顯示舊數據
         hoverlabel=dict(
             align="left"
         ),
@@ -894,8 +895,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='date',  # 採用標準時間軸，完美解決日期排序錯亂問題
-            tickformat='%Y-%m-%d',  # 維持標準日期格式
+            type='date',
+            tickformat='%Y-%m-%d',
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
