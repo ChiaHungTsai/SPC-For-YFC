@@ -609,20 +609,24 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
+    # 【絕對修復日期解析】：確保檢驗日期轉換為標準 Datetime，無法解析的直接濾除以防亂序
     if "檢驗日期" in clean_data.columns:
         clean_data["_dt"] = pd.to_datetime(clean_data["檢驗日期"], errors='coerce')
+        # 濾除日期解析失敗的列，確保時間軸絕對乾淨
+        clean_data = clean_data.dropna(subset=["_dt"]).copy()
     
     if active_batch_col is not None:
         clean_data["_x_val"] = clean_data[active_batch_col].astype(str).str.strip()
 
-    # 【絕對修復】：以 _dt 物件進行全域時間升冪排序，並強制依 Datetime 時間先後順序產生唯一日期陣列
     if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
-        clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
+        # 嚴格依 Datetime 升冪排序
+        sort_cols = ["_dt"] + ([active_batch_col] if active_batch_col is not None else [])
+        clean_data = clean_data.sort_values(by=sort_cols, ascending=True).reset_index(drop=True)
         
-        # 嚴格依照 Datetime 排序後再轉字串，防止字串排序導致月份錯亂
+        # 透過 Datetime 排序後取得不重複的日期字串，絕對不會發生月份錯亂
         unique_sorted_dates = clean_data["_dt"].dropna().sort_values().dt.strftime('%Y-%m-%d').drop_duplicates().tolist()
         
-        x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d').fillna(clean_data.index.to_series().astype(str))
+        x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d')
         xaxis_title_text = "日期"
     else:
         unique_sorted_dates = []
@@ -952,7 +956,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         xaxis=dict(
             type='category',
             categoryorder='array',
-            categoryarray=unique_sorted_dates,  # 嚴格依照 Datetime 升冪排序後的時間陣列
+            categoryarray=unique_sorted_dates,  # 絕對依時間先後順序排列的唯一日期陣列
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
