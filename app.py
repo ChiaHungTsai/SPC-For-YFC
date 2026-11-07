@@ -249,18 +249,11 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 【終極強化版】批號結尾數字精準排序函數 ====================
+# ==================== 【絕對精準版】批號結尾數字排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
-    # 針對 XA08G007 這種格式：抓取英文字母最後一個字元（如 G 或 E 等）後方的所有數字
-    match = re.search(r'[A-Za-z](\d+)$', s_str)
-    if match:
-        try:
-            return (0, int(match.group(1)), s_str)
-        except ValueError:
-            pass
-    # 備用：抓取字串中所有的數字，取最後一組
+    # 抓取字串結尾處的連續數字（例如 XA08G007 抓出 7，XA23G019 抓出 19）
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
@@ -643,10 +636,10 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 【強制精準排序】：透過 sorted 配合 batch_sort_key 產生正確排序的唯一批號清單
+            # 【核心修復】：利用 sorted 配合 batch_sort_key 產生絕對正確的唯一批號順序清單
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
-            # 將資料表依照這個清單設定成 Categorical，並強制重新排序
+            # 將資料依據這個排好序的清單強制定為 Categorical
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
             clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
             
@@ -810,7 +803,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_sizes_sub.append(m_sz)
             else:
                 if active_batch_col is not None:
-                    # 確保子區塊也嚴格依照 unique_batches 的索引進行對齊與排序
+                    # 確保子區塊也強制依據 unique_batches 索引排序
                     sub_df[active_batch_col] = sub_df[active_batch_col].astype(str).str.strip()
                     sub_df['__sort_idx'] = sub_df[active_batch_col].map(lambda x: unique_batches.index(x) if x in unique_batches else 999999)
                     sub_df = sub_df.sort_values(by='__sort_idx').drop(columns=['__sort_idx'])
