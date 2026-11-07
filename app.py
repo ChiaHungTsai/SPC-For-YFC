@@ -249,11 +249,10 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 【絕對精準版】批號結尾數字排序函數 ====================
+# ==================== 【萬無一失版】批號結尾數字萃取排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
-    # 抓取字串結尾處的連續數字（例如 XA08G007 抓出 7，XA23G019 抓出 19）
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
@@ -636,13 +635,15 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 【核心修復】：利用 sorted 配合 batch_sort_key 產生絕對正確的唯一批號順序清單
+            # 【終極解法】：直接透過 Python 內建 sorted 配合 batch_sort_key 產生絕對有序的唯一批號列表
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
-            # 將資料依據這個排好序的清單強制定為 Categorical
-            clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
-            clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
+            # 【關鍵強制重建】：建立一個對照字典，將每個批號對應到一個「純整數索引 (0, 1, 2, 3...)」
+            batch_to_idx = {batch: idx for idx, batch in enumerate(unique_batches)}
+            clean_data['_x_num_idx'] = clean_data[active_batch_col].map(batch_to_idx)
             
+            # 依據數值索引進行絕對強制全域排序
+            clean_data = clean_data.sort_values(by='_x_num_idx').reset_index(drop=True)
             xaxis_title_text = active_batch_col
         else:
             clean_data = clean_data.reset_index(drop=True)
@@ -803,13 +804,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_sizes_sub.append(m_sz)
             else:
                 if active_batch_col is not None:
-                    # 確保子區塊也強制依據 unique_batches 索引排序
-                    sub_df[active_batch_col] = sub_df[active_batch_col].astype(str).str.strip()
-                    sub_df['__sort_idx'] = sub_df[active_batch_col].map(lambda x: unique_batches.index(x) if x in unique_batches else 999999)
-                    sub_df = sub_df.sort_values(by='__sort_idx').drop(columns=['__sort_idx'])
-                    plot_x = sub_df[active_batch_col].tolist()
+                    # 【數字座標軸強制對齊】：直接提取整數索引位置（0, 1, 2...）
+                    plot_x = sub_df['_x_num_idx'].tolist()
                 else:
-                    plot_x = sub_df.index.astype(str).tolist()
+                    plot_x = sub_df.index.tolist()
                 
                 plot_y = sub_df["測定值"].tolist()
                 marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], []
@@ -868,9 +866,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 marker_sizes_list.append(m_sz)
         else:
             if active_batch_col is not None:
-                plot_x = clean_data[active_batch_col].astype(str).tolist()
+                plot_x = clean_data['_x_num_idx'].tolist()
             else:
-                plot_x = clean_data.index.astype(str).tolist()
+                plot_x = clean_data.index.tolist()
             
             plot_y = clean_data["測定值"].tolist()
             marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
@@ -932,6 +930,31 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             annotation_position="bottom right"
         )
 
+    # 【終極刻度強制對應設定】
+    xaxis_config = dict(
+        type='date' if use_date_axis else 'linear',
+        tickfont=dict(color="#000000"),
+        title_font=dict(color="#000000"),
+        tickangle=-45,
+        showline=True,
+        linewidth=1,
+        linecolor='black',
+        mirror=True,
+        showspikes=True,
+        spikemode="across",
+        spikesnap="cursor",
+        spikethickness=1,
+        spikecolor="black",
+        spikedash="dash"
+    )
+    
+    if not use_date_axis and len(unique_batches) > 0:
+        xaxis_config.update(
+            tickmode='array',
+            tickvals=list(range(len(unique_batches))),
+            ticktext=unique_batches
+        )
+
     fig.update_layout(
         title=dict(text="", font=dict(color="#000000", size=1)),
         xaxis_title=dict(text=xaxis_title_text, font=dict(color="#000000", size=12)),
@@ -950,26 +973,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             bordercolor="#000000",
             borderwidth=1
         ),
-        xaxis=dict(
-            type='date' if use_date_axis else 'category',
-            categoryorder='array' if not use_date_axis else None,
-            categoryarray=unique_batches if not use_date_axis else None,
-            tickformat='%Y-%m-%d' if use_date_axis else None,
-            tickfont=dict(color="#000000"),
-            title_font=dict(color="#000000"),
-            tickangle=-45,
-            nticks=30,
-            showline=True,
-            linewidth=1,
-            linecolor='black',
-            mirror=True,
-            showspikes=True,
-            spikemode="across",
-            spikesnap="cursor",
-            spikethickness=1,
-            spikecolor="black",
-            spikedash="dash"
-        ),
+        xaxis=xaxis_config,
         yaxis=dict(
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
@@ -1040,7 +1044,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
 
     with st.expander("點此查看該項目的完整歷史數據明細"):
-        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
+        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str", "_x_num_idx"], errors="ignore"), use_container_width=True, key="history_data_table")
         
 elif len(raw_specs_list) > 0 and len(selected_specs) > 0:
     st.warning("該篩選條件下沒有對應的數據。")
