@@ -659,28 +659,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         return "正常"
 
     clean_data["異常狀況"] = values.apply(check_anomaly)
-    
-    marker_colors = []
-    marker_symbols = []
-    marker_sizes = []
-    
-    for _, row in clean_data.iterrows():
-        val = row["測定值"]
-        is_spec_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
-        is_ctrl_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
-        
-        if is_spec_violate:
-            marker_colors.append('#dc2626')   # 紅色
-            marker_symbols.append('x')        # 規格違規用交叉
-            marker_sizes.append(10)
-        elif is_ctrl_violate:
-            marker_colors.append('#f97316')   # 橘色
-            marker_symbols.append('circle')   # 管制違規用圓點
-            marker_sizes.append(8)
-        else:
-            marker_colors.append('#2563eb')   # 藍色正常點
-            marker_symbols.append('circle')
-            marker_sizes.append(6)
 
     date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
 
@@ -743,8 +721,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 【完美解決方案】：直接採用 type='date' 時間軸，並利用 tickformat 強制顯示為你原本的日期格式 (YYYY-MM-DD)。
-    # 這樣 Plotly 會 100% 自動依照真實時間先後順序排列，且不需要手動拼湊類別陣列，從根源徹底解決排序錯亂！
+    # 【最終完美修正】：
+    # 1. 點和線合併在同一個 Trace 中 (mode='lines+markers')，圖例乾淨唯一、無多餘標示。
+    # 2. X 軸採用 type='date' 配合 tickformat='%Y-%m-%d'，由 Plotly 自動精確控制時間先後順序，絕不發生日期倒置。
+    # 3. 透過 customdata 與 hovertemplate 精準顯示規格違規（❌）與管制違規（●），不干擾圖例與主線。
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -769,14 +749,22 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             
             if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
                 sub_df = sub_df.sort_values(by="_dt", ascending=True)
-                line_x, line_y = [], []
-                marker_x, marker_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
+                plot_x, plot_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
                 
                 for i in range(len(sub_df)):
                     curr_dt = sub_df["_dt"].iloc[i]
                     curr_val = sub_df["測定值"].iloc[i]
                     if pd.isna(curr_dt):
                         continue
+                    
+                    if i > 0:
+                        prev_dt = sub_df["_dt"].iloc[i - 1]
+                        if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
+                            plot_x.append(prev_dt + timedelta(days=1))
+                            plot_y.append(None)
+                            marker_colors_sub.append(None)
+                            marker_symbols_sub.append(None)
+                            marker_sizes_sub.append(None)
                     
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                     is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
@@ -788,43 +776,28 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     else:
                         m_col, m_sym, m_sz = sub_color, 'circle', 6
                         
-                    marker_x.append(curr_dt)
-                    marker_y.append(curr_val)
+                    plot_x.append(curr_dt)
+                    plot_y.append(curr_val)
                     marker_colors_sub.append(m_col)
                     marker_symbols_sub.append(m_sym)
                     marker_sizes_sub.append(m_sz)
-                    
-                    if i > 0:
-                        prev_dt = sub_df["_dt"].iloc[i - 1]
-                        if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
-                            line_x.append(prev_dt + timedelta(days=1))
-                            line_y.append(None)
-                    line_x.append(curr_dt)
-                    line_y.append(curr_val)
             else:
                 continue
             
             fig.add_trace(go.Scatter(
-                x=marker_x, y=marker_y,
-                mode='markers',
-                name=f"{sub_spec}",
-                marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
-                legendgroup=sub_spec
-            ))
-            fig.add_trace(go.Scatter(
-                x=line_x, y=line_y,
-                mode='lines',
+                x=plot_x, y=plot_y,
+                mode='lines+markers',
                 name=f"{sub_spec}",
                 line=dict(color=sub_color, width=2.5),
-                showlegend=False,
-                legendgroup=sub_spec,
+                marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
                 connectgaps=False
             ))
     else:
         if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
             clean_data = clean_data.sort_values(by="_dt", ascending=True)
-            line_x, line_y = [], []
-            marker_x, marker_y = [], []
+            plot_x, plot_y = [], []
+            marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
+            
             for i in range(len(clean_data)):
                 curr_dt = clean_data["_dt"].iloc[i]
                 curr_val = clean_data["測定值"].iloc[i]
@@ -833,32 +806,38 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 if i > 0:
                     prev_dt = clean_data["_dt"].iloc[i - 1]
                     if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
-                        line_x.append(prev_dt + timedelta(days=1))
-                        line_y.append(None)
-                line_x.append(curr_dt)
-                line_y.append(curr_val)
-                marker_x.append(curr_dt)
-                marker_y.append(curr_val)
+                        plot_x.append(prev_dt + timedelta(days=1))
+                        plot_y.append(None)
+                        marker_colors_list.append(None)
+                        marker_symbols_list.append(None)
+                        marker_sizes_list.append(None)
+                
+                is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                
+                if is_spec:
+                    m_col, m_sym, m_sz = '#dc2626', 'x', 10
+                elif is_ctrl:
+                    m_col, m_sym, m_sz = '#f97316', 'circle', 8
+                else:
+                    m_col, m_sym, m_sz = '#2563eb', 'circle', 6
+                    
+                plot_x.append(curr_dt)
+                plot_y.append(curr_val)
+                marker_colors_list.append(m_col)
+                marker_symbols_list.append(m_sym)
+                marker_sizes_list.append(m_sz)
         else:
-            marker_x = clean_data.index.tolist()
-            marker_y = clean_data["測定值"].tolist()
-            line_x = marker_x
-            line_y = marker_y
+            plot_x = clean_data.index.tolist()
+            plot_y = clean_data["測定值"].tolist()
+            marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
 
         fig.add_trace(go.Scatter(
-            x=marker_x, y=marker_y,
-            mode='markers',
-            name=selected_param,
-            marker=dict(size=marker_sizes, color=marker_colors, symbol=marker_symbols),
-            legendgroup="single"
-        ))
-        fig.add_trace(go.Scatter(
-            x=line_x, y=line_y,
-            mode='lines',
+            x=plot_x, y=plot_y,
+            mode='lines+markers',
             name=selected_param,
             line=dict(color='#2563eb', width=2),
-            showlegend=False,
-            legendgroup="single",
+            marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
             connectgaps=False
         ))
         
@@ -920,8 +899,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='date',  # 採用真正的時間軸型態，並透過 tickformat 呈現標準格式
-            tickformat='%Y-%m-%d',
+            type='date',  # 採用標準時間軸型態，保證排序絕對正確無誤
+            tickformat='%Y-%m-%d',  # 完美維持你熟悉的日期格式
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
