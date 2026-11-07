@@ -528,7 +528,6 @@ if "end_date" not in st.session_state:
 if st.session_state["start_date"] > st.session_state["end_date"]:
     st.session_state["start_date"] = st.session_state["end_date"]
 
-# 檢查當前資料是否有檢驗日期
 has_valid_dates = "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
@@ -560,7 +559,6 @@ if has_valid_dates:
         )
         st.session_state["end_date"] = end_date
 
-# 依檢驗日期篩選資料
 filtered_df = final_df.copy()
 if has_valid_dates and len(filtered_df) > 0:
     try:
@@ -608,14 +606,12 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     fmt_str = f"{{:.{decimal_places}f}}"
     plotly_fmt = f".{decimal_places}f"
 
-    # 尋找可用的批號欄位
     active_batch_col = None
     for candidate in ["批號", "批次", "檢驗批號"]:
         if candidate in clean_data.columns and clean_data[candidate].dropna().astype(str).str.strip().ne("").any():
             active_batch_col = candidate
             break
 
-    # 【智慧判斷 X 軸模式】：若有有效日期則用日期，否則改用批號
     use_date_axis = has_valid_dates and clean_data["_dt"].notna().any()
 
     if use_date_axis:
@@ -677,12 +673,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         date_str_range = "全批號區間"
 
-    # 1. 統計摘要標題
-    specs_display_text = ", ".join(selected_specs) if len(selected_specs) > 0 else ""
-    spec_display_part = f" ➔ <span style='color: #dc2626;'>{specs_display_text}</span>" if len(selected_specs) > 0 else ""
     summary_title_html = f"""
     <div class="highlight-title-box">
-        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part if 'spec_display_part' in locals() else ""} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
     </div>
     """
     st.markdown(summary_title_html, unsafe_allow_html=True)
@@ -726,17 +719,15 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 2. 管制圖標題
     chart_title_html = f"""
     <div class="highlight-title-box">
-        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part if 'spec_display_part' in locals() else ""} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
     </div>
     """
     st.markdown(chart_title_html, unsafe_allow_html=True)
 
     fig = go.Figure()
     
-    # 依據有無日期，動態切換 X 軸繪製邏輯
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a', '#0d9488', '#d97706', '#db2777', '#7c3aed',
@@ -921,7 +912,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="x unified" if use_date_axis else "closest",
+        hovermode="x unified",  # 【關鍵修正】：無論是時間軸或批號類別軸，全面強制啟用 'x unified'，讓游標移到 X 軸位置時自動聚合顯示該位置的所有數值
         hoverlabel=dict(
             align="left"
         ),
