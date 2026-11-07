@@ -249,22 +249,17 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 【終極強化版】批號結尾數字排序函數 ====================
+# ==================== 【完美修復版】批號排序函數（精準抓取結尾數字） ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
-    # 從結尾處尋找連續的數字群組（例如 IDI01032AC 結尾前面的數字）
-    match = re.search(r'(\d+)[A-Za-z]*$', s_str)
-    if match:
-        try:
-            return (0, int(match.group(1)), s_str)
-        except ValueError:
-            pass
-    # 備用：抓取所有數字取最後一個
+    # 針對像 XA08G007 這種格式：抓取結尾處的數字（例如 007 -> 7）
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
-            return (0, int(digits[-1]), s_str)
+            # 抓取最後一組數字作為流水編號比對依據
+            val = int(digits[-1])
+            return (0, val, s_str)
         except ValueError:
             pass
     return (1, 0, s_str)
@@ -643,7 +638,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 依據批號專屬排序函數進行全域排序
+            # 【核心修復】：將排序 key 指向 batch_sort_key，強制依結尾數字大小排序
             clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True).reset_index(drop=True)
             unique_batches = clean_data[active_batch_col].dropna().drop_duplicates().tolist()
             xaxis_title_text = active_batch_col
@@ -807,7 +802,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             else:
                 if active_batch_col is not None:
                     sub_df[active_batch_col] = sub_df[active_batch_col].astype(str).str.strip()
-                    # 【強制一致對齊】：嚴格依照全域唯一的有序批號清單（unique_batches）來對齊排序
                     sub_df['__sort_idx'] = sub_df[active_batch_col].map(lambda x: unique_batches.index(x) if x in unique_batches else 999999)
                     sub_df = sub_df.sort_values(by='__sort_idx').drop(columns=['__sort_idx'])
                     plot_x = sub_df[active_batch_col].tolist()
@@ -871,7 +865,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 marker_sizes_list.append(m_sz)
         else:
             if active_batch_col is not None:
-                # 確保單一規格也強制對齊 unique_batches
                 clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
                 clean_data['__sort_idx'] = clean_data[active_batch_col].map(lambda x: unique_batches.index(x) if x in unique_batches else 999999)
                 clean_data = clean_data.sort_values(by='__sort_idx').drop(columns=['__sort_idx'])
