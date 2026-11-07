@@ -236,7 +236,6 @@ def load_and_preprocess_data(url):
         if limit_col in temp_df.columns:
             temp_df[limit_col] = pd.to_numeric(temp_df[limit_col], errors='coerce')
             
-    # 【全面強化日期解析】：使用 format='mixed' 確保所有格式一致的日期字串被精確轉為 Datetime
     if "檢驗日期" in temp_df.columns:
         temp_df["_dt"] = pd.to_datetime(temp_df["檢驗日期"], format='mixed', errors='coerce')
     else:
@@ -613,33 +612,28 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
-    # 【絕對修復排序邏輯】：先轉為 datetime，濾除 NaT，再嚴格依時間升冪排序，並產生唯一有序日期清單
     if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
         clean_data = clean_data.dropna(subset=["_dt"]).copy()
+        # 嚴格依 Datetime 升冪排序
         sort_cols = ["_dt"] + ([active_batch_col] if active_batch_col is not None else [])
         clean_data = clean_data.sort_values(by=sort_cols, ascending=True).reset_index(drop=True)
         
-        # 嚴格依照 Datetime 排序後去重，保證時間先後順序 100% 正確
-        unique_sorted_dates = clean_data["_dt"].sort_values().dt.strftime('%Y-%m-%d').drop_duplicates().tolist()
-        
-        x_labels = clean_data["_dt"].dt.strftime('%Y-%m-%d')
+        # 準備傳入圖表的數據，直接使用 datetime 物件或標準化字串
+        clean_data["_date_str"] = clean_data["_dt"].dt.strftime('%Y-%m-%d')
         xaxis_title_text = "日期"
     else:
-        unique_sorted_dates = []
         if active_batch_col is not None:
             clean_data = clean_data.sort_values(by=active_batch_col, ascending=True).reset_index(drop=True)
-            x_labels = clean_data[active_batch_col].astype(str).str.strip()
+            clean_data["_date_str"] = clean_data[active_batch_col].astype(str).str.strip()
             xaxis_title_text = active_batch_col
         else:
-            x_labels = clean_data.index.astype(str)
+            clean_data["_date_str"] = clean_data.index.astype(str)
             xaxis_title_text = "日期"
 else:
     clean_data = pd.DataFrame()
     decimal_places = 2
     fmt_str = "{:.2f}"
     plotly_fmt = ".2f"
-    x_labels = []
-    unique_sorted_dates = []
     xaxis_title_text = "日期"
 
 if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
@@ -687,15 +681,15 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         is_ctrl_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
         
         if is_spec_violate:
-            marker_colors.append('#dc2626')   # 紅色
-            marker_symbols.append('x')        # 規格違規用交叉
+            marker_colors.append('#dc2626')
+            marker_symbols.append('x')
             marker_sizes.append(10)
         elif is_ctrl_violate:
-            marker_colors.append('#f97316')   # 橘色
-            marker_symbols.append('circle')   # 管制違規用圓點
+            marker_colors.append('#f97316')
+            marker_symbols.append('circle')
             marker_sizes.append(8)
         else:
-            marker_colors.append('#2563eb')   # 藍色正常點
+            marker_colors.append('#2563eb')
             marker_symbols.append('circle')
             marker_sizes.append(6)
 
@@ -750,7 +744,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 2. 管制圖標題 (包含製造單位與製程階段)
+    # 2. 管制圖標題
     chart_title_html = f"""
     <div class="highlight-title-box">
         {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
@@ -760,6 +754,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
+    # 【關鍵升級】：捨棄類別軸，全面改用 Plotly 內建的 type='date' 時間軸！
+    # 這樣 X 軸會 100% 自動按照真實的時間先後順序排列，且超過 1 天未檢驗會自動斷線，絕不會把日期排錯或擠到後面。
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#0f172a',  # 極深黑藍 (Slate 900)
@@ -803,7 +799,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     else:
                         m_col, m_sym, m_sz = sub_color, 'circle', 6
                         
-                    marker_x.append(curr_dt.strftime('%Y-%m-%d'))
+                    marker_x.append(curr_dt)
                     marker_y.append(curr_val)
                     marker_colors_sub.append(m_col)
                     marker_symbols_sub.append(m_sym)
@@ -812,27 +808,12 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     if i > 0:
                         prev_dt = sub_df["_dt"].iloc[i - 1]
                         if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
-                            line_x.append((prev_dt + timedelta(days=1)).strftime('%Y-%m-%d'))
+                            line_x.append(prev_dt + timedelta(days=1))
                             line_y.append(None)
-                    line_x.append(curr_dt.strftime('%Y-%m-%d'))
+                    line_x.append(curr_dt)
                     line_y.append(curr_val)
             else:
-                sub_x_col = active_batch_col if active_batch_col and active_batch_col in sub_df.columns else sub_df.index
-                sub_df = sub_df.sort_values(by=sub_x_col)
-                marker_x = sub_df[sub_x_col].astype(str).str.strip().tolist()
-                marker_y = sub_df["測定值"].tolist()
-                marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], []
-                for v_val in marker_y:
-                    is_spec = (usl is not None and v_val > usl) or (lsl is not None and v_val < lsl)
-                    is_ctrl = (ucl is not None and v_val > ucl) or (lcl is not None and v_val < lcl)
-                    if is_spec:
-                        marker_colors_sub.append('#dc2626'); marker_symbols_sub.append('x'); marker_sizes_sub.append(10)
-                    elif is_ctrl:
-                        marker_colors_sub.append('#f97316'); marker_symbols_sub.append('circle'); marker_sizes_sub.append(8)
-                    else:
-                        marker_colors_sub.append(sub_color); marker_symbols_sub.append('circle'); marker_sizes_sub.append(6)
-                line_x = marker_x
-                line_y = marker_y
+                continue
             
             fig.add_trace(go.Scatter(
                 x=marker_x, y=marker_y,
@@ -863,15 +844,15 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 if i > 0:
                     prev_dt = clean_data["_dt"].iloc[i - 1]
                     if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
-                        line_x.append((prev_dt + timedelta(days=1)).strftime('%Y-%m-%d'))
+                        line_x.append(prev_dt + timedelta(days=1))
                         line_y.append(None)
-                line_x.append(curr_dt.strftime('%Y-%m-%d'))
+                line_x.append(curr_dt)
                 line_y.append(curr_val)
-                marker_x.append(curr_dt.strftime('%Y-%m-%d'))
+                marker_x.append(curr_dt)
                 marker_y.append(curr_val)
         else:
-            marker_x = x_labels.tolist() if hasattr(x_labels, "tolist") else list(x_labels)
-            marker_y = values.tolist() if hasattr(values, "tolist") else list(values)
+            marker_x = clean_data.index.tolist()
+            marker_y = values.tolist()
             line_x = marker_x
             line_y = marker_y
 
@@ -950,9 +931,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='category',
-            categoryorder='array',
-            categoryarray=unique_sorted_dates,  # 嚴格依 Datetime 時間先後順序排列的唯一日期陣列
+            type='date',  # 【核心修正】：設定為真正的日期時間軸，由 Plotly 自動做完美的時間先後排序與顯示
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
@@ -993,7 +972,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         spec_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出規格範圍"])
         control_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出管制範圍"])
         
-        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 (共 {len(abnormal_df)} 筆違規點：超出規格範圍 {spec_count} 筆，超出管制範圍 {control_count} 筆)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 (共 {len(abnormal_df)} 筆違規點：超出規格範圍 {spec_count} 筆, 超出管制範圍 {control_count} 筆)</div>', unsafe_allow_html=True)
         
         col_name_mapping = {
             "異常狀況": "異常狀況",
