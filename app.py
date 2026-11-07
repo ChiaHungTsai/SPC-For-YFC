@@ -249,7 +249,24 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 自然排序輔助函數 ====================
+# ==================== 批號專屬排序函數（優先比對最後3位數字大小） ====================
+def batch_sort_key(s):
+    import re
+    s_str = str(s).strip()
+    # 萃取字串中的所有數字群組
+    digits = re.findall(r'\d+', s_str)
+    if digits:
+        # 取最後一個數字群組作為結尾數值進行數值比對
+        last_digits = digits[-1]
+        # 為了安全比對，將結尾轉為整數，其餘部分作為次要排序
+        try:
+            val = int(last_digits)
+            # 如果這組數字剛好是最後 3 位或是整體結尾，賦予最高權重
+            return (0, val, s_str)
+        except ValueError:
+            pass
+    return (1, 0, s_str)
+
 def natural_sort_key(s):
     import re
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
@@ -509,7 +526,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇 (僅在非凡立水課或有日期時顯示) ====================
+# ==================== 5. 檢驗日期區間選擇 ====================
 today = date.today()
 current_year = today.year
 
@@ -528,7 +545,7 @@ if "end_date" not in st.session_state:
 if st.session_state["start_date"] > st.session_state["end_date"]:
     st.session_state["start_date"] = st.session_state["end_date"]
 
-# 【規則判定】：凡立水課的 IPQC、FQC、OQC 強制使用批號，不顯示日期篩選區間
+# 凡立水課的 IPQC、FQC、OQC 強制使用批號模式
 is_fanlishui_batch_mode = (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"])
 has_valid_dates = not is_fanlishui_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
@@ -614,7 +631,6 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
-    # 【核心邏輯判定】：若為凡立水課的 IPQC/FQC/OQC，強制使用批號軸 (`use_date_axis = False`)
     use_date_axis = has_valid_dates and not is_fanlishui_batch_mode and clean_data["_dt"].notna().any()
 
     if use_date_axis:
@@ -623,7 +639,8 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
         xaxis_title_text = "日期"
     else:
         if active_batch_col is not None:
-            clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(natural_sort_key), ascending=True).reset_index(drop=True)
+            # 【核心修復】：依據批號最後 3 位數字大小進行升冪排序
+            clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True).reset_index(drop=True)
             xaxis_title_text = active_batch_col
         else:
             clean_data = clean_data.reset_index(drop=True)
@@ -782,7 +799,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_sizes_sub.append(m_sz)
             else:
                 if active_batch_col is not None:
-                    sub_df = sub_df.sort_values(by=active_batch_col, key=lambda x: x.map(natural_sort_key), ascending=True)
+                    # 批號模式下依據結尾 3 位數字大小排序
+                    sub_df = sub_df.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True)
                     plot_x = sub_df[active_batch_col].astype(str).str.strip().tolist()
                 else:
                     plot_x = sub_df.index.astype(str).tolist()
@@ -844,7 +862,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 marker_sizes_list.append(m_sz)
         else:
             if active_batch_col is not None:
-                clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(natural_sort_key), ascending=True)
+                clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True)
                 plot_x = clean_data[active_batch_col].astype(str).str.strip().tolist()
             else:
                 plot_x = clean_data.index.astype(str).tolist()
