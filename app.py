@@ -528,37 +528,41 @@ if "end_date" not in st.session_state:
 if st.session_state["start_date"] > st.session_state["end_date"]:
     st.session_state["start_date"] = st.session_state["end_date"]
 
-cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
-with cols_val5[0]:
-    st.markdown('<div class="row-label">檢驗日期</div>', unsafe_allow_html=True)
-with cols_val5[1]:
-    st.markdown('<div class="inline-sub-label">開始</div>', unsafe_allow_html=True)
-with cols_val5[2]:
-    start_date = st.date_input(
-        "起始日期", 
-        value=st.session_state["start_date"], 
-        max_value=st.session_state["end_date"], 
-        key="start_date_input", 
-        label_visibility="collapsed"
-    )
-    st.session_state["start_date"] = start_date
+# 檢查當前資料是否有檢驗日期
+has_valid_dates = "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
-with cols_val5[3]:
-    st.markdown('<div class="inline-sub-label">結束</div>', unsafe_allow_html=True)
-with cols_val5[4]:
-    end_date = st.date_input(
-        "結束日期", 
-        value=st.session_state["end_date"], 
-        min_value=st.session_state["start_date"], 
-        max_value=today, 
-        key="end_date_input", 
-        label_visibility="collapsed"
-    )
-    st.session_state["end_date"] = end_date
+if has_valid_dates:
+    cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
+    with cols_val5[0]:
+        st.markdown('<div class="row-label">檢驗日期</div>', unsafe_allow_html=True)
+    with cols_val5[1]:
+        st.markdown('<div class="inline-sub-label">開始</div>', unsafe_allow_html=True)
+    with cols_val5[2]:
+        start_date = st.date_input(
+            "起始日期", 
+            value=st.session_state["start_date"], 
+            max_value=st.session_state["end_date"], 
+            key="start_date_input", 
+            label_visibility="collapsed"
+        )
+        st.session_state["start_date"] = start_date
+
+    with cols_val5[3]:
+        st.markdown('<div class="inline-sub-label">結束</div>', unsafe_allow_html=True)
+    with cols_val5[4]:
+        end_date = st.date_input(
+            "結束日期", 
+            value=st.session_state["end_date"], 
+            min_value=st.session_state["start_date"], 
+            max_value=today, 
+            key="end_date_input", 
+            label_visibility="collapsed"
+        )
+        st.session_state["end_date"] = end_date
 
 # 依檢驗日期篩選資料
 filtered_df = final_df.copy()
-if len(filtered_df) > 0 and "_dt" in final_df.columns:
+if has_valid_dates and len(filtered_df) > 0:
     try:
         date_mask = (filtered_df["_dt"].dt.date >= start_date) & (filtered_df["_dt"].dt.date <= end_date)
         filtered_df = filtered_df[date_mask | filtered_df["_dt"].isna()]
@@ -604,24 +608,34 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     fmt_str = f"{{:.{decimal_places}f}}"
     plotly_fmt = f".{decimal_places}f"
 
+    # 尋找可用的批號欄位
     active_batch_col = None
     for candidate in ["批號", "批次", "檢驗批號"]:
         if candidate in clean_data.columns and clean_data[candidate].dropna().astype(str).str.strip().ne("").any():
             active_batch_col = candidate
             break
 
-    if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
-        clean_data = clean_data.dropna(subset=["_dt"]).copy()
+    # 【智慧判斷 X 軸模式】：若有有效日期則用日期，否則改用批號
+    use_date_axis = has_valid_dates and clean_data["_dt"].notna().any()
+
+    if use_date_axis:
         clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
         xaxis_title_text = "日期"
     else:
-        xaxis_title_text = "日期"
+        if active_batch_col is not None:
+            clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(natural_sort_key), ascending=True).reset_index(drop=True)
+            xaxis_title_text = active_batch_col
+        else:
+            clean_data = clean_data.reset_index(drop=True)
+            xaxis_title_text = "序號"
 else:
     clean_data = pd.DataFrame()
     decimal_places = 2
     fmt_str = "{:.2f}"
     plotly_fmt = ".2f"
     xaxis_title_text = "日期"
+    use_date_axis = False
+    active_batch_col = None
 
 if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
     values = clean_data["測定值"]
@@ -658,7 +672,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     clean_data["異常狀況"] = values.apply(check_anomaly)
 
-    date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
+    if use_date_axis:
+        date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
+    else:
+        date_str_range = "全批號區間"
 
     # 1. 統計摘要標題
     specs_display_text = ", ".join(selected_specs) if len(selected_specs) > 0 else ""
@@ -719,20 +736,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
-    # 【關鍵修改】：將 hovermode 恢復為 'x unified'，讓滑鼠移動到某個日期時，能同時顯示該日期位置所有曲線有數據的值。
-    # 為了完美配合 type='date' 且不顯示空白日期的跨日錯誤數值，我們將所有曲線統一對齊到資料庫實際出現過的所有有效檢驗日期上。
+    # 依據有無日期，動態切換 X 軸繪製邏輯
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
-            '#0f172a',  # 極深黑藍 (Slate 900)
-            '#0d9488',  # 鮮明青綠 (Teal 600)
-            '#d97706',  # 琥珀金黃 (Amber 600)
-            '#db2777',  # 亮桃紅 (Pink 600)
-            '#7c3aed',  # 亮紫色 (Violet 600)
-            '#0284c7',  # 亮天藍 (Sky 600)
-            '#65a30d',  # 青草黃綠 (Lime 600)
-            '#9333ea',  # 寶石紫 (Purple 600)
-            '#4f46e5',  # 靛青色 (Indigo 600)
-            '#ca8a04'   # 深土黃 (Yellow 600)
+            '#0f172a', '#0d9488', '#d97706', '#db2777', '#7c3aed',
+            '#0284c7', '#65a30d', '#9333ea', '#4f46e5', '#ca8a04'
         ]
         
         for idx, sub_spec in enumerate(selected_specs):
@@ -743,7 +751,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 
             sub_color = color_palette[idx % len(color_palette)]
             
-            if "_dt" in sub_df.columns and sub_df["_dt"].notna().any():
+            if use_date_axis:
                 sub_df = sub_df.sort_values(by="_dt", ascending=True)
                 plot_x, plot_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
                 
@@ -778,7 +786,23 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_symbols_sub.append(m_sym)
                     marker_sizes_sub.append(m_sz)
             else:
-                continue
+                if active_batch_col is not None:
+                    sub_df = sub_df.sort_values(by=active_batch_col, key=lambda x: x.map(natural_sort_key), ascending=True)
+                    plot_x = sub_df[active_batch_col].astype(str).str.strip().tolist()
+                else:
+                    plot_x = sub_df.index.astype(str).tolist()
+                
+                plot_y = sub_df["測定值"].tolist()
+                marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], []
+                for curr_val in plot_y:
+                    is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                    is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                    if is_spec:
+                        marker_colors_sub.append('#dc2626'); marker_symbols_sub.append('x'); marker_sizes_sub.append(10)
+                    elif is_ctrl:
+                        marker_colors_sub.append('#f97316'); marker_symbols_sub.append('circle'); marker_sizes_sub.append(8)
+                    else:
+                        marker_colors_sub.append(sub_color); marker_symbols_sub.append('circle'); marker_sizes_sub.append(6)
             
             fig.add_trace(go.Scatter(
                 x=plot_x, y=plot_y,
@@ -789,7 +813,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 connectgaps=False
             ))
     else:
-        if "_dt" in clean_data.columns and clean_data["_dt"].notna().any():
+        if use_date_axis:
             clean_data = clean_data.sort_values(by="_dt", ascending=True)
             plot_x, plot_y = [], []
             marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
@@ -824,9 +848,23 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 marker_symbols_list.append(m_sym)
                 marker_sizes_list.append(m_sz)
         else:
-            plot_x = clean_data.index.tolist()
+            if active_batch_col is not None:
+                clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(natural_sort_key), ascending=True)
+                plot_x = clean_data[active_batch_col].astype(str).str.strip().tolist()
+            else:
+                plot_x = clean_data.index.astype(str).tolist()
+            
             plot_y = clean_data["測定值"].tolist()
             marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
+            for curr_val in plot_y:
+                is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                if is_spec:
+                    marker_colors_list.append('#dc2626'); marker_symbols_list.append('x'); marker_sizes_list.append(10)
+                elif is_ctrl:
+                    marker_colors_list.append('#f97316'); marker_symbols_list.append('circle'); marker_sizes_list.append(8)
+                else:
+                    marker_colors_list.append('#2563eb'); marker_symbols_list.append('circle'); marker_sizes_list.append(6)
 
         fig.add_trace(go.Scatter(
             x=plot_x, y=plot_y,
@@ -883,7 +921,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
         font=dict(color="#000000", family="sans-serif"),
-        hovermode="x unified",  # 恢復為 'x unified'，讓游標移到某個日期時，能同時顯示該日期下所有曲線的值
+        hovermode="x unified" if use_date_axis else "closest",
         hoverlabel=dict(
             align="left"
         ),
@@ -895,8 +933,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             borderwidth=1
         ),
         xaxis=dict(
-            type='date',
-            tickformat='%Y-%m-%d',
+            type='date' if use_date_axis else 'category',
+            tickformat='%Y-%m-%d' if use_date_axis else None,
             tickfont=dict(color="#000000"),
             title_font=dict(color="#000000"),
             tickangle=-45,
