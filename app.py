@@ -249,17 +249,10 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 【完美對齊】批號結尾 3 位數字排序函數 ====================
+# ==================== 批號結尾數字精準排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
-    # 專門抓取類似 XA08G007、XC17G051 結尾的數值進行絕對正確排序
-    match = re.search(r'[Gg](\d+)$', s_str)
-    if match:
-        try:
-            return (0, int(match.group(1)), s_str)
-        except ValueError:
-            pass
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
@@ -642,7 +635,6 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 產生絕對正確排序的唯一批號列表
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             batch_to_idx = {batch: idx for idx, batch in enumerate(unique_batches)}
