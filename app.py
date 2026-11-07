@@ -249,10 +249,17 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 批號結尾數字精準排序函數 ====================
+# ==================== 【完美對齊】批號結尾 3 位數字排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
+    # 專門抓取類似 XA08G007、XC17G051 結尾的數值進行絕對正確排序
+    match = re.search(r'[Gg](\d+)$', s_str)
+    if match:
+        try:
+            return (0, int(match.group(1)), s_str)
+        except ValueError:
+            pass
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
@@ -635,6 +642,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
+            # 產生絕對正確排序的唯一批號列表
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             batch_to_idx = {batch: idx for idx, batch in enumerate(unique_batches)}
@@ -768,10 +776,12 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             if use_date_axis:
                 sub_df = sub_df.sort_values(by="_dt", ascending=True)
                 plot_x, plot_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
+                customdata_sub = []
                 
                 for i in range(len(sub_df)):
                     curr_dt = sub_df["_dt"].iloc[i]
                     curr_val = sub_df["測定值"].iloc[i]
+                    curr_batch = sub_df[active_batch_col].iloc[i] if active_batch_col else ""
                     if pd.isna(curr_dt):
                         continue
                     
@@ -783,6 +793,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                             marker_colors_sub.append('#00000000')
                             marker_symbols_sub.append('circle')
                             marker_sizes_sub.append(0)
+                            customdata_sub.append("")
                     
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                     is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
@@ -799,11 +810,14 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_colors_sub.append(m_col)
                     marker_symbols_sub.append(m_sym)
                     marker_sizes_sub.append(m_sz)
+                    customdata_sub.append(curr_batch)
             else:
                 if active_batch_col is not None:
                     plot_x = sub_df['_x_num_idx'].tolist()
+                    customdata_sub = sub_df[active_batch_col].tolist()
                 else:
                     plot_x = sub_df.index.tolist()
+                    customdata_sub = ["" ] * len(sub_df)
                 
                 plot_y = sub_df["測定值"].tolist()
                 marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], []
@@ -821,6 +835,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 x=plot_x, y=plot_y,
                 mode='lines+markers',
                 name=f"{sub_spec}",
+                customdata=customdata_sub,
+                hovertemplate="批號: %{customdata}<br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
                 connectgaps=False
@@ -830,10 +846,12 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             clean_data = clean_data.sort_values(by="_dt", ascending=True)
             plot_x, plot_y = [], []
             marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
+            customdata_list = []
             
             for i in range(len(clean_data)):
                 curr_dt = clean_data["_dt"].iloc[i]
                 curr_val = clean_data["測定值"].iloc[i]
+                curr_batch = clean_data[active_batch_col].iloc[i] if active_batch_col else ""
                 if pd.isna(curr_dt):
                     continue
                 if i > 0:
@@ -844,6 +862,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         marker_colors_list.append('#00000000')
                         marker_symbols_list.append('circle')
                         marker_sizes_list.append(0)
+                        customdata_list.append("")
                 
                 is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                 is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
@@ -860,11 +879,14 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 marker_colors_list.append(m_col)
                 marker_symbols_list.append(m_sym)
                 marker_sizes_list.append(m_sz)
+                customdata_list.append(curr_batch)
         else:
             if active_batch_col is not None:
                 plot_x = clean_data['_x_num_idx'].tolist()
+                customdata_list = clean_data[active_batch_col].tolist()
             else:
                 plot_x = clean_data.index.tolist()
+                customdata_list = ["" ] * len(clean_data)
             
             plot_y = clean_data["測定值"].tolist()
             marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
@@ -882,6 +904,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             x=plot_x, y=plot_y,
             mode='lines+markers',
             name=selected_param,
+            customdata=customdata_list,
+            hovertemplate="批號: %{customdata}<br>%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
             line=dict(color='#2563eb', width=2),
             marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
             connectgaps=False
@@ -926,7 +950,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             annotation_position="bottom right"
         )
 
-    # 【X 軸刻度與間距終極優化設定】
+    # X 軸刻度與間距配置
     xaxis_config = dict(
         type='date' if use_date_axis else 'linear',
         tickfont=dict(color="#000000", size=10),
@@ -946,8 +970,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     if not use_date_axis and len(unique_batches) > 0:
         total_b = len(unique_batches)
-        # 依據批號總數動態計算合適的刻度間距 (dtick)，避免文字過密重疊
-        step = max(1, total_b // 25)  # 畫面大約最多顯示 25 個主要刻度標籤
+        step = max(1, total_b // 25)
         xaxis_config.update(
             tickmode='array',
             tickvals=list(range(total_b))[::step],
