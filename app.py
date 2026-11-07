@@ -221,7 +221,7 @@ def load_and_preprocess_data(url):
     if prod_col and prod_col != "樣品名稱":
         temp_df = temp_df.rename(columns={prod_col: "樣品名稱"})
         
-    for col in ["單位", "階段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL"]:
+    for col in ["單位", "階段", "樣品名稱", "分析項目", "取樣点/規格", "小數位數", "USL", "LSL", "UCL", "LCL"]:
         if col in temp_df.columns:
             temp_df[col] = temp_df[col].astype(str).str.strip()
             temp_df.loc[temp_df[col].isin(["nan", "NaN", "None", "NAT", "nat", ""]), col] = np.nan
@@ -249,17 +249,22 @@ for rc in required_cols:
         st.error(f"資料表缺少必要欄位：「{rc}」！目前讀到的欄位有: {df.columns.tolist()}")
         st.stop()
 
-# ==================== 【完美修復版】批號排序函數（精準抓取結尾數字） ====================
+# ==================== 【精準解析 XA08G007 格式】批號排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
-    # 針對像 XA08G007 這種格式：抓取結尾處的數字（例如 007 -> 7）
+    # 針對像 XA08G007 這種格式：抓取英文字母後面、最後面那組數字（例如 007 -> 7）
+    match = re.search(r'[Gg](\d+)$', s_str)
+    if match:
+        try:
+            return (0, int(match.group(1)), s_str)
+        except ValueError:
+            pass
+    # 通用備用：抓取字串中的所有數字，取最後一組
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
-            # 抓取最後一組數字作為流水編號比對依據
-            val = int(digits[-1])
-            return (0, val, s_str)
+            return (0, int(digits[-1]), s_str)
         except ValueError:
             pass
     return (1, 0, s_str)
@@ -638,7 +643,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 【核心修復】：將排序 key 指向 batch_sort_key，強制依結尾數字大小排序
+            # 依照精準的 batch_sort_key 進行全局排序
             clean_data = clean_data.sort_values(by=active_batch_col, key=lambda x: x.map(batch_sort_key), ascending=True).reset_index(drop=True)
             unique_batches = clean_data[active_batch_col].dropna().drop_duplicates().tolist()
             xaxis_title_text = active_batch_col
