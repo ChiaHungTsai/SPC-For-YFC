@@ -245,32 +245,27 @@ df = load_and_preprocess_data(GOOGLE_SHEET_CSV_URL)
 
 required_cols = ["單位", "階段", "樣品名稱", "分析項目", "測定值"]
 for rc in required_cols:
-    if rc != "階段" and rc not in df.columns: # 略過階段檢查以防萬一
+    if rc != "階段" and rc not in df.columns:
         pass
 
-# ==================== 【終極萬能】批號結尾與日期結構精準排序函數 ====================
+# ==================== 【嚴格從結尾判斷】批號排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
     
-    # 針對包含英文字母結尾的批號（如 XG31693134E）：抓取英文字母前的數字，或抓取最後的數字區段
-    match_alpha_end = re.search(r'(\d+)[A-Za-z]+$', s_str)
-    if match_alpha_end:
-        digits_sub = re.findall(r'\d+', match_alpha_end.group(1))
-        if digits_sub:
-            try:
-                return (0, int(digits_sub[-1]), s_str)
-            except ValueError:
-                pass
-
-    # 一般通用：抓取字串中所有的數字群組
+    # 嚴格規則：從字串結尾開始往回看，排除結尾的英文字母，並抓取前面緊鄰的一組數字（支援任意位數流水號，例如 007 -> 7 或 3134 -> 3134）
+    match = re.search(r'(\d+)[A-Za-z]*$', s_str)
+    if match:
+        try:
+            return (0, int(match.group(1)), s_str)
+        except ValueError:
+            pass
+            
+    # 備用保底：抓取所有數字取最後一個
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
-            # 如果有多段數字（例如日期+流水號），通常流水號在最後一段或倒數第二段
-            # 這裡取最後一段合適的數值
-            val = int(digits[-1])
-            return (0, val, s_str)
+            return (0, int(digits[-1]), s_str)
         except ValueError:
             pass
             
@@ -650,7 +645,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 產生絕對正確排序的唯一批號列表
+            # 透過升級後的嚴格排序函數產生正確清單
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
