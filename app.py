@@ -117,17 +117,14 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 統一將一二三列按鈕寬度設為 75px，確保高度與對齊一致 */
-    .stButton > button,
-    div[data-testid="column"] .stButton > button {
-        width: 75px !important;
-        min-width: 75px !important;
-        max-width: 75px !important;
+    /* 按鈕大小舒適，完整顯示文字絕不截斷 */
+    .stButton > button {
+        width: 100% !important;
         height: 36px !important;
+        padding: 2px 6px !important;
+        font-size: 13px !important;
         min-height: 36px !important;
         max-height: 36px !important;
-        padding: 2px 2px !important;
-        font-size: 11px !important;
         white-space: nowrap !important;
     }
     
@@ -183,9 +180,8 @@ st.markdown("""
         width: 100% !important;
     }
     
-    /* 縮小列與列之間的間距 */
     .row-spacer {
-        height: 2px !important;
+        height: 4px;
     }
     
     .highlight-title-box {
@@ -328,7 +324,7 @@ st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid & Button Row) ====================
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
-button_row_weights = [0.7, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 2.0]
+button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
