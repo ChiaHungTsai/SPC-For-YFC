@@ -130,18 +130,21 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 終極解決方案：強制將 Streamlit 橫向排列的行內區塊轉為 Flexbox，實現同行並排、固定間距、不換行 */
-    div[data-testid="column"] {
-        width: auto !important;
-        flex: 0 0 auto !important;
-        min-width: unset !important;
-        padding: 0px !important;
+    /* 終極 Flexbox 容器：強制所有按鈕橫向並排、不換行、間距 12px、垂直置中 */
+    .row-button-flex {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 12px !important;
+        align-items: center !important;
+        height: 36px !important;
+        width: 100% !important;
     }
     
-    /* 讓整個按鈕列的父容器變成橫向 Flex 排版並保有 12px 間距 */
-    div[data-testid="column"]:has(.stButton) {
-        display: inline-flex !important;
-        margin-right: 12px !important;
+    /* 覆寫 Streamlit 預設包在按鈕外層的 div 屬性，避免干擾 Flexbox */
+    .row-button-flex > div {
+        width: auto !important;
+        flex: 0 0 auto !important;
     }
     
     .refresh-btn-fixed {
@@ -339,7 +342,6 @@ with header_cols[1]:
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid) ====================
-# [標籤欄(0.7), 下拉/選單欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(0.9), 剩餘空白(0.6)]
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -369,7 +371,7 @@ with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
 with cols_unit[1]:
-    # 直接在欄位內依序產生成員按鈕，透過 CSS 轉為 Flex 橫向並排
+    st.markdown('<div class="row-button-flex">', unsafe_allow_html=True)
     for unit in fixed_units_list:
         has_data = unit in available_units
         is_active = (selected_unit == unit)
@@ -381,6 +383,7 @@ with cols_unit[1]:
                     st.rerun()
         else:
             st.button(unit, key=f"u_{unit}", disabled=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -419,6 +422,7 @@ with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
 with cols_stage[1]:
+    st.markdown('<div class="row-button-flex">', unsafe_allow_html=True)
     for stage_label, raw_name in stages_dict.items():
         has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
         if has_stage_data:
@@ -430,6 +434,7 @@ with cols_stage[1]:
                     st.rerun()
         else:
             st.button(stage_label, key=f"s_{stage_label}", disabled=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
