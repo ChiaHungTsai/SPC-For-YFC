@@ -8,7 +8,7 @@ from datetime import date, timedelta
 # 1. 網頁基本設定 (寬螢幕、隱藏側邊欄)
 st.set_page_config(page_title="義芳化學品保科 - SPC 統計製程管制儀表板", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 自訂 CSS（統一對齊與按鈕樣式）
+# 2. 自訂 CSS
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {display: none;}
@@ -117,9 +117,8 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 按鈕固定精緻寬度，拒絕變形 */
     .stButton > button {
-        width: 120px !important;
+        width: 100% !important;
         height: 36px !important;
         padding: 2px 6px !important;
         font-size: 13px !important;
@@ -322,9 +321,9 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域精準對齊的 8 欄網格比例配置 ====================
-# [標籤欄, 主輸入框欄, 間距欄, 次輸入框欄, 下拉選單欄, 按鈕A欄, 按鈕B欄, 剩餘空白]
-unified_row_weights = [0.8, 3.2, 0.5, 0.9, 1.8, 0.9, 0.9, 1.2]
+# ==================== 統一全域精準對齊的網格比例配置 ====================
+# [標籤欄, 下拉選單欄, 取樣點標籤欄, 取樣點選單欄, 全選按鈕欄, 全部取消按鈕欄, 剩餘空白]
+perfect_row_weights = [0.8, 3.2, 0.8, 2.5, 0.8, 0.8, 1.4]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -348,7 +347,7 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-cols_unit = st.columns([0.8, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.5])
+cols_unit = st.columns([0.8, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.0])
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
@@ -397,7 +396,7 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns([0.8, 1.1, 1.1, 1.1, 1.1, 4.9])
+cols_stage = st.columns([0.8, 1.1, 1.1, 1.1, 1.1, 4.4])
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
@@ -423,7 +422,7 @@ products_list = sorted(products_list, key=natural_sort_key)
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-cols_row3 = st.columns(unified_row_weights)
+cols_row3 = st.columns(perfect_row_weights)
 
 with cols_row3[0]:
     st.markdown('<div class="row-label">樣品名稱</div>', unsafe_allow_html=True)
@@ -456,13 +455,13 @@ elif len(raw_specs_list) == 1:
 is_all_selected = len(raw_specs_list) > 0 and set(st.session_state.get("current_spec", [])) == set(raw_specs_list)
 is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
-with cols_row3[5]:
+with cols_row3[4]:
     if len(raw_specs_list) > 0:
         if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
             st.session_state["current_spec"] = raw_specs_list.copy()
             st.rerun()
 
-with cols_row3[6]:
+with cols_row3[5]:
     if len(raw_specs_list) > 0:
         if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
             st.session_state["current_spec"] = []
@@ -471,7 +470,7 @@ with cols_row3[6]:
 with cols_row3[2]:
     st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
 
-with cols_row3[4]:
+with cols_row3[3]:
     if len(raw_specs_list) > 0:
         selected_specs = st.multiselect(
             "取樣點/規格",
@@ -501,8 +500,8 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單（長度與上方樣品名稱絕對對等） ====================
-cols_param = st.columns(unified_row_weights)
+# ==================== 4. 分析項目下拉選單（與上方樣品名稱下拉選單長度 100% 相同） ====================
+cols_param = st.columns(perfect_row_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
