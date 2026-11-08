@@ -118,7 +118,7 @@ st.markdown("""
     }
     
     /* 統一將一二三列按鈕寬度設為 75px，確保高度與對齊一致 */
-    .uniform-btn-row .stButton > button,
+    .stButton > button,
     div[data-testid="column"] .stButton > button {
         width: 75px !important;
         min-width: 75px !important;
@@ -653,3 +653,411 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
         clean_data = clean_data.sort_values(by="_dt", ascending=True).reset_index(drop=True)
         xaxis_title_text = "日期"
         unique_batches = []
+    else:
+        if active_batch_col is not None:
+            clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
+            unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
+            
+            clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
+            clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
+            
+            xaxis_title_text = active_batch_col
+        else:
+            clean_data = clean_data.reset_index(drop=True)
+            unique_batches = []
+            xaxis_title_text = "序號"
+else:
+    clean_data = pd.DataFrame()
+    decimal_places = 2
+    fmt_str = "{:.2f}"
+    plotly_fmt = ".2f"
+    xaxis_title_text = "日期"
+    use_date_axis = False
+    active_batch_col = None
+    unique_batches = []
+
+if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
+    values = clean_data["測定值"]
+    mean_val = values.mean()
+    std_val = values.std(ddof=1) if len(values) > 1 else 0.0
+    n = len(values)
+
+    usl = float(clean_data["USL"].dropna().iloc[0]) if "USL" in clean_data.columns and len(clean_data["USL"].dropna()) > 0 else None
+    lsl = float(clean_data["LSL"].dropna().iloc[0]) if "LSL" in clean_data.columns and len(clean_data["LSL"].dropna()) > 0 else None
+    ucl = float(clean_data["UCL"].dropna().iloc[0]) if "UCL" in clean_data.columns and len(clean_data["UCL"].dropna()) > 0 else None
+    lcl = float(clean_data["LCL"].dropna().iloc[0]) if "LCL" in clean_data.columns and len(clean_data["LCL"].dropna()) > 0 else None
+
+    cpu = (usl - mean_val) / (3 * std_val) if usl is not None and std_val > 0 else 0
+    cpl = (mean_val - lsl) / (3 * std_val) if lsl is not None and std_val > 0 else 0
+    
+    if usl is not None and lsl is not None:
+        cpk = min(cpu, cpl)
+    elif usl is not None:
+        cpk = cpu
+    elif lsl is not None:
+        cpk = cpl
+    else:
+        cpk = 0.0
+
+    def check_anomaly(val):
+        spec_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
+        control_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
+        
+        if spec_violate:
+            return "超出規格範圍"
+        elif control_violate:
+            return "超出管制範圍"
+        return "Normal"
+
+    clean_data["異常狀況"] = values.apply(check_anomaly)
+
+    if use_date_axis:
+        date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
+    else:
+        date_str_range = "全批號區間"
+
+    summary_title_html = f"""
+    <div class="highlight-title-box">
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part if 'spec_display_part' in locals() else ""} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
+    </div>
+    """
+    st.markdown(summary_title_html, unsafe_allow_html=True)
+    st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
+    
+    def render_custom_metric(label, value, bg_color, border_color, label_color, unique_key):
+        st.markdown(f"""
+            <div key="{unique_key}" style="
+                background-color: {bg_color};
+                border: 1.5px solid {border_color};
+                padding: 4px 8px;
+                border-radius: 6px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                height: 52px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            ">
+                <div style="color: {label_color}; font-size: 10px; font-weight: 600; line-height: 1.2;">{label}</div>
+                <div style="color: #000000; font-size: 14px; font-weight: 700; line-height: 1.3;">{value}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    m1, m2, m3, m4, m5, m6, m7, m8 = st.columns(8)
+    with m1:
+        render_custom_metric("有效樣本數 (n)", f"{n:,}", "#ffffff", "#cbd5e1", "#000000", "m1")
+    with m2:
+        render_custom_metric("平均值 (Mean)", fmt_str.format(mean_val), "#f0fdf4", "#10b981", "#047857", "m2")
+    with m3:
+        render_custom_metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places), "#ffffff", "#cbd5e1", "#000000", "m3")
+    with m4:
+        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
+    with m5:
+        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m5")
+    with m6:
+        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m6")
+    with m7:
+        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m7")
+    with m8:
+        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m8")
+    
+    st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
+
+    chart_title_html = f"""
+    <div class="highlight-title-box">
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part if 'spec_display_part' in locals() else ""} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
+    </div>
+    """
+    st.markdown(chart_title_html, unsafe_allow_html=True)
+
+    fig = go.Figure()
+    
+    if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
+        color_palette = [
+            '#0f172a', '#0d9488', '#d97706', '#db2777', '#7c3aed',
+            '#0284c7', '#65a30d', '#9333ea', '#4f46e5', '#ca8a04'
+        ]
+        
+        for idx, sub_spec in enumerate(selected_specs):
+            sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
+            sub_df = sub_df.dropna(subset=["測定值"])
+            if len(sub_df) == 0:
+                continue
+                
+            sub_color = color_palette[idx % len(color_palette)]
+            
+            if use_date_axis:
+                sub_df = sub_df.sort_values(by="_dt", ascending=True)
+                plot_x, plot_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
+                
+                for i in range(len(sub_df)):
+                    curr_dt = sub_df["_dt"].iloc[i]
+                    curr_val = sub_df["測定值"].iloc[i]
+                    if pd.isna(curr_dt):
+                        continue
+                    
+                    if i > 0:
+                        prev_dt = sub_df["_dt"].iloc[i - 1]
+                        if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
+                            plot_x.append(prev_dt + timedelta(days=1))
+                            plot_y.append(None)
+                            marker_colors_sub.append('#00000000')
+                            marker_symbols_sub.append('circle')
+                            marker_sizes_sub.append(0)
+                    
+                    is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                    is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                    
+                    if is_spec:
+                        m_col, m_sym, m_sz = '#dc2626', 'x', 10
+                    elif is_ctrl:
+                        m_col, m_sym, m_sz = '#f97316', 'circle', 8
+                    else:
+                        m_col, m_sym, m_sz = sub_color, 'circle', 6
+                        
+                    plot_x.append(curr_dt)
+                    plot_y.append(curr_val)
+                    marker_colors_sub.append(m_col)
+                    marker_symbols_sub.append(m_sym)
+                    marker_sizes_sub.append(m_sz)
+            else:
+                if active_batch_col is not None:
+                    plot_x = sub_df[active_batch_col].astype(str).tolist()
+                else:
+                    plot_x = sub_df.index.astype(str).tolist()
+                
+                plot_y = sub_df["測定值"].tolist()
+                marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], []
+                for curr_val in plot_y:
+                    is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                    is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                    if is_spec:
+                        marker_colors_sub.append('#dc2626'); marker_symbols_sub.append('x'); marker_sizes_sub.append(10)
+                    elif is_ctrl:
+                        marker_colors_sub.append('#f97316'); marker_symbols_sub.append('circle'); marker_sizes_sub.append(8)
+                    else:
+                        marker_colors_sub.append(sub_color); marker_symbols_sub.append('circle'); marker_sizes_sub.append(6)
+            
+            fig.add_trace(go.Scatter(
+                x=plot_x, y=plot_y,
+                mode='lines+markers',
+                name=f"{sub_spec}",
+                hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
+                line=dict(color=sub_color, width=2.5),
+                marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
+                connectgaps=False
+            ))
+    else:
+        if use_date_axis:
+            clean_data = clean_data.sort_values(by="_dt", ascending=True)
+            plot_x, plot_y = [], []
+            marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
+            
+            for i in range(len(clean_data)):
+                curr_dt = clean_data["_dt"].iloc[i]
+                curr_val = clean_data["測定值"].iloc[i]
+                if pd.isna(curr_dt):
+                    continue
+                if i > 0:
+                    prev_dt = clean_data["_dt"].iloc[i - 1]
+                    if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
+                        plot_x.append(prev_dt + timedelta(days=1))
+                        plot_y.append(None)
+                        marker_colors_list.append('#00000000')
+                        marker_symbols_list.append('circle')
+                        marker_sizes_list.append(0)
+                
+                is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                
+                if is_spec:
+                    m_col, m_sym, m_sz = '#dc2626', 'x', 10
+                elif is_ctrl:
+                    m_col, m_sym, m_sz = '#f97316', 'circle', 8
+                else:
+                    m_col, m_sym, m_sz = '#2563eb', 'circle', 6
+                    
+                plot_x.append(curr_dt)
+                plot_y.append(curr_val)
+                marker_colors_list.append(m_col)
+                marker_symbols_list.append(m_sym)
+                marker_sizes_list.append(m_sz)
+        else:
+            if active_batch_col is not None:
+                plot_x = clean_data[active_batch_col].astype(str).tolist()
+            else:
+                plot_x = clean_data.index.astype(str).tolist()
+            
+            plot_y = clean_data["測定值"].tolist()
+            marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
+            for curr_val in plot_y:
+                is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                if is_spec:
+                    marker_colors_list.append('#dc2626'); marker_symbols_list.append('x'); marker_sizes_list.append(10)
+                elif is_ctrl:
+                    marker_colors_list.append('#f97316'); marker_symbols_list.append('circle'); marker_sizes_list.append(8)
+                else:
+                    marker_colors_list.append('#2563eb'); marker_symbols_list.append('circle'); marker_sizes_list.append(6)
+
+        fig.add_trace(go.Scatter(
+            x=plot_x, y=plot_y,
+            mode='lines+markers',
+            name=selected_param,
+            hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
+            line=dict(color='#2563eb', width=2),
+            marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
+            connectgaps=False
+        ))
+        
+        fig.add_hline(
+            y=mean_val, line_dash="solid", line_color="#10b981", 
+            annotation_text=f"CL: {fmt_str.format(mean_val)}", 
+            annotation_font_color="#10b981",
+            annotation_position="bottom right"
+        )
+    
+    if ucl is not None:
+        fig.add_hline(
+            y=ucl, line_dash="dot", line_color="#f97316", 
+            annotation_text=f"UCL: {fmt_str.format(ucl)}", 
+            annotation_font_color="#f97316",
+            annotation_position="top left"
+        )
+    
+    if lcl is not None:
+        fig.add_hline(
+            y=lcl, line_dash="dot", line_color="#f97316", 
+            annotation_text=f"LCL: {fmt_str.format(lcl)}", 
+            annotation_font_color="#f97316",
+            annotation_position="bottom left"
+        )
+        
+    if usl is not None:
+        fig.add_hline(
+            y=usl, line_dash="dash", line_color="#ef4444", 
+            annotation_text=f"USL: {fmt_str.format(usl)}", 
+            annotation_font_color="#ef4444",
+            annotation_position="top right"
+        )
+        
+    if lsl is not None:
+        fig.add_hline(
+            y=lsl, line_dash="dash", line_color="#ef4444", 
+            annotation_text=f"LSL: {fmt_str.format(lsl)}", 
+            annotation_font_color="#ef4444",
+            annotation_position="bottom right"
+        )
+
+    fig.update_layout(
+        title=dict(text="", font=dict(color="#000000", size=1)),
+        xaxis_title=dict(text=xaxis_title_text, font=dict(color="#000000", size=12)),
+        yaxis_title=dict(text=selected_param, font=dict(color="#000000", size=12)),
+        plot_bgcolor="#ffffff",
+        paper_bgcolor="#ffffff",
+        font=dict(color="#000000", family="sans-serif"),
+        hovermode="x unified",
+        hoverlabel=dict(
+            align="left",
+            namelength=0
+        ),
+        margin=dict(l=60, r=40, t=50, b=80),
+        legend=dict(
+            y=0.5,
+            yanchor="middle",
+            bordercolor="#000000",
+            borderwidth=1
+        ),
+        xaxis=dict(
+            type='date' if use_date_axis else 'category',
+            categoryorder='array' if not use_date_axis else None,
+            categoryarray=unique_batches if not use_date_axis else None,
+            tickformat='%Y-%m-%d' if use_date_axis else None,
+            tickfont=dict(color="#000000", size=10),
+            title_font=dict(color="#000000"),
+            tickangle=-45,
+            nticks=30,
+            showline=True,
+            linewidth=1,
+            linecolor='black',
+            mirror=True,
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikethickness=1,
+            spikecolor="black",
+            spikedash="dash"
+        ),
+        yaxis=dict(
+            tickfont=dict(color="#000000"),
+            title_font=dict(color="#000000"),
+            title=dict(text=selected_param, font=dict(color="#000000", size=12)),
+            tickformat=plotly_fmt,
+            showline=True,
+            linewidth=1,
+            linecolor='black',
+            mirror=True,
+            showspikes=True,
+            spikemode="across",
+            spikesnap="cursor",
+            spikethickness=1,
+            spikecolor="black",
+            spikedash="dash"
+        )
+    )
+    st.plotly_chart(fig, use_container_width=True, key="spc_main_chart")
+
+    abnormal_df = clean_data[clean_data["異常狀況"] != "Normal"].copy()
+    
+    if len(abnormal_df) > 0:
+        spec_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出規格範圍"])
+        control_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出管制範圍"])
+        
+        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 (共 {len(abnormal_df)} 筆違規點：超出規格範圍 {spec_count} 筆，超出管制範圍 {control_count} 筆)</div>', unsafe_allow_html=True)
+        
+        col_name_mapping = {
+            "異常狀況": "異常狀況",
+            active_batch_col: active_batch_col,
+            "檢驗日期": "檢驗日期",
+            "測定值": "測定值",
+            "USL": "規格上限 (USL)",
+            "LSL": "規格下限 (LSL)",
+            "UCL": "管制上限 (UCL)",
+            "LCL": "管制下限 (LCL)"
+        }
+        
+        display_cols = [c for c in ["異常狀況", active_batch_col, "檢驗日期", "測定值", "USL", "LSL", "UCL", "LCL"] if c in abnormal_df.columns or c == "異常狀況"]
+        
+        table_html = '<table class="custom-alert-table"><thead><tr>'
+        for col in display_cols:
+            header_label = col_name_mapping.get(col, col)
+            table_html += f'<th>{header_label}</th>'
+        table_html += '</tr></thead><tbody>'
+        
+        for _, row in abnormal_df[display_cols].iterrows():
+            table_html += '<tr>'
+            for col in display_cols:
+                val = row[col]
+                if pd.isna(val):
+                    val_str = ""
+                elif col == "異常狀況":
+                    if "規格" in str(val):
+                        val_str = "❌ 超出規格範圍"
+                    else:
+                        val_str = "⚠️ 超出管制範圍"
+                elif isinstance(val, float):
+                    val_str = f"{val:.{decimal_places}f}"
+                else:
+                    val_str = str(val)
+                table_html += f'<td>{val_str}</td>'
+            table_html += '</tr>'
+        table_html += '</tbody></table>'
+        
+        st.markdown(table_html, unsafe_allow_html=True)
+    else:
+        st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
+
+    with st.expander("點此查看該項目的完整歷史數據明細"):
+        st.dataframe(clean_data.drop(columns=["_dt", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
+        
+elif len(raw_specs_list) > 0 and len(selected_specs) > 0:
+    st.warning("該篩選條件下沒有對應的數據。")
