@@ -321,12 +321,13 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域絕對對齊的主網格框架 (Master Grid) ====================
-# [標籤欄(0.7), 欄位1(3.0), 欄位2(0.8), 欄位3(2.5), 欄位4(0.9), 欄位5(0.9), 欄位6(0.6)] -> 總共 7 個對齊欄位
+# ==================== 網格比例設定 ====================
+# 下方選擇列的主網格：[標籤欄(0.7), 樣品選單(3.0), 取樣點標籤(0.8), 取樣點選單(2.5), 全選按鈕(0.9), 取消按鈕(0.9), 剩餘空白(0.6)]
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
-# 上方按鈕列專用網格：[標籤欄(0.7), 7個等寬按鈕欄(各1.0), 剩餘空白(0.6)] -> 第一欄絕對維持 0.7 確保開頭 100% 切齊
-button_row_weights = [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6]
+# 上方按鈕列專用網格：[標籤欄(0.7), 7個按鈕欄(各0.8), 2個空白佔位欄(各0.8), 剩餘空白(0.6)]
+# 總共 9 個按鈕空間，讓按鈕自動變小並在後方多出 2 個空白欄！
+button_row_weights = [0.7, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -369,7 +370,7 @@ for i, unit in enumerate(fixed_units_list):
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 2. 製程階段按鈕群組（與第一排完全相同的 button_row_weights，按鈕長度百分之百一致） ====================
+# ==================== 2. 製程階段按鈕群組（後方自動多出 2 個空白欄讓按鈕縮小） ====================
 stages_dict = {
     "原料IQC": "原料",
     "製程IPQC": "製程",
@@ -416,8 +417,8 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
         else:
             st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
 
-# 後方以 st.empty 佔位，維持網格平衡且完全不顯示多餘按鈕
-for ghost_idx in range(len(stages_dict), 7):
+# 後方以 st.empty 佔位（包含 2 個額外空白欄位總共補齊至 9 個空間）
+for ghost_idx in range(len(stages_dict), 9):
     with cols_stage[ghost_idx + 1]:
         st.empty()
 
@@ -508,7 +509,7 @@ with cols_row3[3]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單（套用完全相同的 master_grid_weights，長度與樣品名稱 100% 絕對等長） ====================
+# ==================== 4. 分析項目下拉選單 ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
