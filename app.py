@@ -117,7 +117,6 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 統一強制鎖定所有按鈕（包含全選、取消）的寬度與高度，確保完美一致 */
     .stButton > button {
         width: 100% !important;
         height: 36px !important;
@@ -322,10 +321,12 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域絕對對齊的黃金網格比例配置 ====================
-# 第一欄（標籤欄）統一為 0.7，按鈕列與下方選單列採用完全對等的 8 欄架構
+# ==================== 統一全域絕對對齊的主網格框架 (Master Grid) ====================
+# [標籤欄(0.7), 欄位1(3.0), 欄位2(0.8), 欄位3(2.5), 欄位4(0.9), 欄位5(0.9), 欄位6(0.6)] -> 總共 7 個對齊欄位
+master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
+
+# 上方按鈕列專用網格：[標籤欄(0.7), 7個等寬按鈕欄(各1.0), 剩餘空白(0.6)] -> 第一欄絕對維持 0.7 確保開頭 100% 切齊
 button_row_weights = [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6]
-perfect_row_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.9]  # 全選與取消按鈕欄寬度完全相同 (0.9 vs 0.9)
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -368,7 +369,7 @@ for i, unit in enumerate(fixed_units_list):
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 2. 製程階段按鈕群組（使用 st.empty 完美佔位，絕不顯示幽靈按鈕） ====================
+# ==================== 2. 製程階段按鈕群組（與第一排完全相同的 button_row_weights，按鈕長度百分之百一致） ====================
 stages_dict = {
     "原料IQC": "原料",
     "製程IPQC": "製程",
@@ -415,7 +416,7 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
         else:
             st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
 
-# 後方直接用空白欄位（st.empty）佔位，乾淨俐落、完全不顯示任何按鈕
+# 後方以 st.empty 佔位，維持網格平衡且完全不顯示多餘按鈕
 for ghost_idx in range(len(stages_dict), 7):
     with cols_stage[ghost_idx + 1]:
         st.empty()
@@ -429,7 +430,7 @@ products_list = sorted(products_list, key=natural_sort_key)
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-cols_row3 = st.columns(perfect_row_weights)
+cols_row3 = st.columns(master_grid_weights)
 
 with cols_row3[0]:
     st.markdown('<div class="row-label">樣品名稱</div>', unsafe_allow_html=True)
@@ -507,8 +508,8 @@ with cols_row3[3]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 ====================
-cols_param = st.columns(perfect_row_weights)
+# ==================== 4. 分析項目下拉選單（套用完全相同的 master_grid_weights，長度與樣品名稱 100% 絕對等長） ====================
+cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
