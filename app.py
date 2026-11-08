@@ -127,10 +127,13 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 幽靈隱藏按鈕：完全透明且不影響點擊與排版佔位 */
-    .ghost-btn button {
+    /* 完美隱藏幽靈佔位按鈕：完全透明、無外框、不佔視覺 */
+    .ghost-space button {
         visibility: hidden !important;
         pointer-events: none !important;
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
     }
     
     .refresh-btn-fixed {
@@ -327,11 +330,8 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域絕對對齊的黃金網格比例配置 ====================
-# [標籤欄(0.7), 下拉/輸入框欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(1.0), 剩餘空白(0.6)]
-perfect_row_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 1.0, 0.6]
-
-# 上方一、二排按鈕採用完全相同的 9 欄框架：[標籤欄(0.7), 7個按鈕欄(各1.0), 剩餘空白(0.6)]
+# ==================== 統一全域絕對對齊的 9 欄黃金網格比例配置 ====================
+# [標籤欄(0.7), 按鈕/選單欄1~7(各1.0), 剩餘空白(0.6)] 讓所有行（製造單位、製程階段、樣品名稱、分析項目）完全等比例對齊！
 button_row_weights = [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -375,7 +375,7 @@ for i, unit in enumerate(fixed_units_list):
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 2. 製程階段按鈕群組（加入 3 個幽靈隱藏按鈕，總數與第一排對齊成 7 個） ====================
+# ==================== 2. 製程階段按鈕群組（加入 3 個完全透明隱藏的幽靈佔位按鈕） ====================
 stages_dict = {
     "原料IQC": "原料",
     "製程IPQC": "製程",
@@ -409,7 +409,6 @@ cols_stage = st.columns(button_row_weights)
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
-# 渲染 4 個實際的階段按鈕
 for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
     has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
     with cols_stage[i + 1]:
@@ -423,23 +422,25 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
         else:
             st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
 
-# 自動補上 3 個隱藏的幽靈佔位按鈕（讓第一排與第二排的寬度、間距百分之百完美對等）
+# 補上 3 個完全不可見的幽靈按鈕，確保寬度與間距和第一排 100% 一致
 for ghost_idx in range(len(stages_dict), 7):
     with cols_stage[ghost_idx + 1]:
-        st.markdown('<div class="ghost-btn">', unsafe_allow_html=True)
+        st.markdown('<div class="ghost-space">', unsafe_allow_html=True)
         st.button(f"ghost_{ghost_idx}", key=f"ghost_{ghost_idx}", disabled=True, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 3. 樣品名稱與取樣點/規格選單 ====================
+# ==================== 3. 樣品名稱與取樣點/規格選單 (對應 9 欄結構配置) ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 products_list = sorted(products_list, key=natural_sort_key)
 
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-cols_row3 = st.columns(perfect_row_weights)
+# 對應 9 欄分配：[標籤(0.7), 樣品選單(3.0), 取樣點標籤(0.8), 取樣點選單(2.5), 全選(0.9), 取消(1.0), 空白(0.6)] -> 總和大約吻合
+row3_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 1.0, 0.6]
+cols_row3 = st.columns(row3_weights)
 
 with cols_row3[0]:
     st.markdown('<div class="row-label">樣品名稱</div>', unsafe_allow_html=True)
@@ -517,8 +518,8 @@ with cols_row3[3]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 ====================
-cols_param = st.columns(perfect_row_weights)
+# ==================== 4. 分析項目下拉選單（套用完全相同的 row3_weights 確保絕對切齊與等長） ====================
+cols_param = st.columns(row3_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
