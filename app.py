@@ -781,10 +781,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     fig = go.Figure()
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
-        # 嚴格避開紅色、橘色系，採用高辨識度且彼此分開的工業色系（深黑藍、明亮藍、青綠、琥珀、深紫、亮青等）
+        # 嚴格避開任何紅色、粉紅、橘色系，採用完全區隔的高對比色系（深藍、亮青、青綠、琥珀、深紫、藍靛等）
         color_palette = [
-            '#0f172a', '#0284c7', '#0d9488', '#d97706', '#7c3aed',
-            '#2563eb', '#4f46e5', '#65a30d', '#9333ea', '#ca8a04'
+            '#0f172a', '#0284c7', '#0d9488', '#d97706', '#4f46e5',
+            '#2563eb', '#10b981', '#65a30d', '#9333ea', '#ca8a04'
         ]
         
         for idx, sub_spec in enumerate(selected_specs):
@@ -847,11 +847,32 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     else:
                         marker_colors_sub.append(sub_color); marker_symbols_sub.append('circle'); marker_sizes_sub.append(6)
             
+            # 動態組裝 hovertemplate 判斷違規狀態並高亮顏色 (紅色代表規格違規、橘色代表管制違規)
+            hover_template_str = (
+                "<b>%{fullSeries.name}</b><br>"
+                + (f"{active_batch_col}: %{{x}}<br>" if active_batch_col else "日期: %{x}<br>")
+                + "測定值: %{y:" + plotly_fmt + "}<br>"
+                + "狀態: %{customdata}"
+                + "<extra></extra>"
+            )
+            
+            custom_data_list = []
+            for val in sub_df["測定值"]:
+                s_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
+                c_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
+                if s_violate:
+                    custom_data_list.append("<span style='color: #dc2626; font-weight: bold;'>❌ 超出規格範圍</span>")
+                elif c_violate:
+                    custom_data_list.append("<span style='color: #f97316; font-weight: bold;'>⚠️ 超出管制範圍</span>")
+                else:
+                    custom_data_list.append("<span style='color: #10b981;'>✅ 正常</span>")
+
             fig.add_trace(go.Scatter(
                 x=plot_x, y=plot_y,
                 mode='lines+markers',
                 name=f"{sub_spec}",
-                hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
+                hovertemplate=hover_template_str,
+                customdata=custom_data_list,
                 line=dict(color=sub_color, width=2.5),
                 marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
                 connectgaps=False
@@ -884,7 +905,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 elif is_ctrl:
                     m_col, m_sym, m_sz = '#f97316', 'circle', 8
                 else:
-                    m_col, m_sym, m_sz = '#0284c7', 'circle', 6  # 使用明亮藍色
+                    m_col, m_sym, m_sz = '#0284c7', 'circle', 6
                     
                 plot_x.append(curr_dt)
                 plot_y.append(curr_val)
@@ -909,12 +930,32 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 else:
                     marker_colors_list.append('#0284c7'); marker_symbols_list.append('circle'); marker_sizes_list.append(6)
 
+        hover_template_single = (
+            "<b>%{fullSeries.name}</b><br>"
+            + (f"{active_batch_col}: %{{x}}<br>" if active_batch_col else "日期: %{x}<br>")
+            + "測定值: %{y:" + plotly_fmt + "}<br>"
+            + "狀態: %{customdata}"
+            + "<extra></extra>"
+        )
+        
+        custom_data_single = []
+        for val in clean_data["測定值"]:
+            s_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
+            c_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
+            if s_violate:
+                custom_data_single.append("<span style='color: #dc2626; font-weight: bold;'>❌ 超出規格範圍</span>")
+            elif c_violate:
+                custom_data_single.append("<span style='color: #f97316; font-weight: bold;'>⚠️ 超出管制範圍</span>")
+            else:
+                custom_data_single.append("<span style='color: #10b981;'>✅ 正常</span>")
+
         fig.add_trace(go.Scatter(
             x=plot_x, y=plot_y,
             mode='lines+markers',
             name=selected_param,
-            hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
-            line=dict(color='#0284c7', width=2),  # 使用明亮藍色
+            hovertemplate=hover_template_single,
+            customdata=custom_data_single,
+            line=dict(color='#0284c7', width=2),
             marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
             connectgaps=False
         ))
