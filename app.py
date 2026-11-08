@@ -248,29 +248,31 @@ for rc in required_cols:
     if rc != "階段" and rc not in df.columns:
         pass
 
-# ==================== 【鐵人防線版】結尾流水號強制萃取與排序函數 ====================
+# ==================== 【嚴格依照您的邏輯】從末端排除字母、抓取 3 個數字排序 ====================
 def batch_sort_key(s):
     s_str = str(s).strip()
     
-    # 從字串尾部開始往回找：先濾掉尾部的所有英文字母（例如 "AC" 或 "E"）
+    # 從最末碼開始往回看：先排除所有英文字母
     i = len(s_str) - 1
-    while i >= 0 and s_str[i].isalpha():
+    while i >= 0 and not s_str[i].isdigit():
         i -= 1
         
-    # 從這個位置繼續往回找連續的數字
-    end_num_idx = i + 1
-    while i >= 0 and s_str[i].isdigit():
+    # 從這裡開始收集 3 個數字
+    digits_collected = []
+    while i >= 0 and len(digits_collected) < 3 and s_str[i].isdigit():
+        digits_collected.append(s_str[i])
         i -= 1
-    start_num_idx = i + 1
-    
-    if start_num_idx < end_num_idx:
-        num_str = s_str[start_num_idx:end_num_idx]
+        
+    if len(digits_collected) > 0:
+        # 因為是從右往左收集，收集到的順序是反的（例如抓到 '4', '4', '0'），我們把它轉回來
+        digits_collected.reverse()
+        num_str = "".join(digits_collected)
         try:
             return (0, int(num_str), s_str)
         except ValueError:
             pass
             
-    # 萬用保底：用正規表達式抓取最後出現的數字
+    # 備用保底：如果找不到 3 個數字，抓取最後出現的數字
     import re
     digits = re.findall(r'\d+', s_str)
     if digits:
@@ -655,7 +657,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 透過精準的切片排序函數產生唯一且正確排序的批號清單
+            # 依照新規則排序
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
