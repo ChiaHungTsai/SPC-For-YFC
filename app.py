@@ -117,7 +117,7 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 一般按鈕大小 */
+    /* 按鈕共用基本設定 */
     .stButton > button {
         height: 36px !important;
         padding: 2px 8px !important;
@@ -127,26 +127,27 @@ st.markdown("""
         white-space: nowrap !important;
     }
 
-    /* 完美對齊與緊密排列的按鈕群組容器 */
-    .filter-row-container {
+    /* 關鍵：純 HTML/CSS Flex 佈局，讓標籤與按鈕在同一列，且按鈕緊密排列、大小一致 */
+    .filter-row-flex {
         display: flex;
         align-items: center;
         width: 100%;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
     }
-    .filter-label-col {
-        width: 70px; /* 與下方選單第一欄標籤寬度完全一致 */
+    .filter-label-area {
+        width: 100px; /* 與下方選單第一欄標籤寬度相符 */
         flex-shrink: 0;
     }
-    .filter-buttons-col {
+    .filter-buttons-area {
         display: flex;
         align-items: center;
-        gap: 8px; /* 緊密的按鈕間距 */
+        gap: 8px; /* 按鈕之間的緊密間距 */
         flex-wrap: nowrap;
         flex-grow: 1;
         padding-left: 12px; /* 與下方選單完美對齊 */
     }
-    .filter-buttons-col div.stButton > button {
+    /* 針對放在 flex 區塊內的按鈕統一設定固定寬度與大小 */
+    .filter-buttons-area div.stButton > button {
         width: 125px !important;
         min-width: 125px !important;
         max-width: 125px !important;
@@ -341,7 +342,7 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 網格寬度配置 (下方選單維持原本的 Master Grid) ====================
+# 下方選單的標準網格寬度配置
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -366,21 +367,19 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-# 使用 Flexbox 結構確保標籤與按鈕在同一列，且按鈕緊密排列
-st.markdown('<div class="filter-row-container"><div class="filter-label-col"><div class="row-label">製造單位</div></div><div class="filter-buttons-col">', unsafe_allow_html=True)
-cols_unit = st.columns(len(fixed_units_list))
-for i, unit in enumerate(fixed_units_list):
-    with cols_unit[i]:
-        has_data = unit in available_units
-        is_active = (selected_unit == unit)
-        if has_data:
-            if st.button(unit, key=f"u_{unit}", use_container_width=False, type="primary" if is_active else "secondary"):
-                if st.session_state["selected_unit"] != unit:
-                    st.session_state["selected_unit"] = unit
-                    on_unit_change()
-                    st.rerun()
-        else:
-            st.button(unit, key=f"u_{unit}", use_container_width=False, disabled=True)
+# 使用 Flexbox 結構包覆製造單位
+st.markdown('<div class="filter-row-flex"><div class="filter-label-area"><div class="row-label">製造單位</div></div><div class="filter-buttons-area">', unsafe_allow_html=True)
+for unit in fixed_units_list:
+    has_data = unit in available_units
+    is_active = (selected_unit == unit)
+    if has_data:
+        if st.button(unit, key=f"u_{unit}", use_container_width=False, type="primary" if is_active else "secondary"):
+            if st.session_state["selected_unit"] != unit:
+                st.session_state["selected_unit"] = unit
+                on_unit_change()
+                st.rerun()
+    else:
+        st.button(unit, key=f"u_{unit}", use_container_width=False, disabled=True)
 st.markdown('</div></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
@@ -415,21 +414,19 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-# 使用 Flexbox 結構確保標籤與按鈕在同一列，且按鈕緊密排列
-st.markdown('<div class="filter-row-container"><div class="filter-label-col"><div class="row-label">製程階段</div></div><div class="filter-buttons-col">', unsafe_allow_html=True)
-cols_stage = st.columns(len(stages_dict))
-for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
+# 使用 Flexbox 結構包覆製程階段
+st.markdown('<div class="filter-row-flex"><div class="filter-label-area"><div class="row-label">製程階段</div></div><div class="filter-buttons-area">', unsafe_allow_html=True)
+for stage_label, raw_name in stages_dict.items():
     has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
-    with cols_stage[i]:
-        if has_stage_data:
-            is_active = (selected_stage_label == stage_label)
-            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, type="primary" if is_active else "secondary"):
-                if st.session_state["selected_stage"] != stage_label:
-                    st.session_state["selected_stage"] = stage_label
-                    on_stage_change()
-                    st.rerun()
-        else:
-            st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, disabled=True)
+    if has_stage_data:
+        is_active = (selected_stage_label == stage_label)
+        if st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, type="primary" if is_active else "secondary"):
+            if st.session_state["selected_stage"] != stage_label:
+                st.session_state["selected_stage"] = stage_label
+                on_stage_change()
+                st.rerun()
+    else:
+        st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, disabled=True)
 st.markdown('</div></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
