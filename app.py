@@ -128,6 +128,13 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
+    /* 將第一二排按鈕寬度設定為 85pt */
+    div[data-testid="column"] .stButton > button {
+        width: 85pt !important;
+        min-width: 85pt !important;
+        max-width: 85pt !important;
+    }
+    
     .refresh-btn-fixed {
         margin-top: 4px; 
     }
