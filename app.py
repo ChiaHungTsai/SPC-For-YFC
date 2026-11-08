@@ -130,21 +130,20 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 強制設定橫向排列，並透過 column padding 拉開按鈕之間的適當間距、絕不重疊 */
+    /* 調整橫向排列按鈕的間距，將 gap 設為 12px 讓按鈕分開 */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
-        gap: 0px !important;
+        gap: 12px !important;
     }
     
     [data-testid="stHorizontalBlock"] > [data-testid="column"] {
         width: auto !important;
         flex: 0 0 auto !important;
         min-width: unset !important;
-        padding-left: 6px !important;
-        padding-right: 6px !important;
+        padding: 0px !important;
     }
     
     .refresh-btn-fixed {
