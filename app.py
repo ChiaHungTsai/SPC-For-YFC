@@ -248,7 +248,7 @@ for rc in required_cols:
     if rc != "階段" and rc not in df.columns:
         pass
 
-# ==================== 【嚴格依照您的邏輯】從末端排除字母、抓取 3 個數字排序 ====================
+# ==================== 批號排序函數 ====================
 def batch_sort_key(s):
     s_str = str(s).strip()
     
@@ -264,7 +264,6 @@ def batch_sort_key(s):
         i -= 1
         
     if len(digits_collected) > 0:
-        # 因為是從右往左收集，收集到的順序是反的（例如抓到 '4', '4', '0'），我們把它轉回來
         digits_collected.reverse()
         num_str = "".join(digits_collected)
         try:
@@ -272,7 +271,6 @@ def batch_sort_key(s):
         except ValueError:
             pass
             
-    # 備用保底：如果找不到 3 個數字，抓取最後出現的數字
     import re
     digits = re.findall(r'\d+', s_str)
     if digits:
@@ -505,8 +503,8 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 ====================
-cols_param = st.columns([0.7, 2.8, 0.45, 0.8, 2.8, 2.2])
+# ==================== 4. 分析項目下拉選單（已與上方完全對齊） ====================
+cols_param = st.columns(row_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
@@ -657,7 +655,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 依照新規則排序
+            # 嚴格依照邏輯排序
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
