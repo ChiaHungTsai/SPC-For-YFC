@@ -321,12 +321,11 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 網格比例設定 ====================
-# 下方選擇列的主網格：[標籤欄(0.7), 樣品選單(3.0), 取樣點標籤(0.8), 取樣點選單(2.5), 全選按鈕(0.9), 取消按鈕(0.9), 剩餘空白(0.6)]
+# ==================== 統一全域絕對對齊的網格比例配置 (Master Grid) ====================
+# 將第一欄（標籤欄）嚴格統一為 0.7，確保所有行（製造單位、製程階段、樣品名稱、分析項目）100% 絕對切齊！
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
-# 上方按鈕列專用網格：[標籤欄(0.7), 7個按鈕欄(各0.8), 2個空白佔位欄(各0.8), 剩餘空白(0.6)]
-# 總共 9 個按鈕空間，讓按鈕自動變小並在後方多出 2 個空白欄！
+# 上方按鈕列專用網格：第一欄 0.7，後方 9 個等寬欄位（包含 2 個縮小按鈕用的空白佔位）
 button_row_weights = [0.7, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -370,7 +369,7 @@ for i, unit in enumerate(fixed_units_list):
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 2. 製程階段按鈕群組（後方自動多出 2 個空白欄讓按鈕縮小） ====================
+# ==================== 2. 製程階段按鈕群組（與第一排共用相同的 button_row_weights，確保按鈕大小完全一致） ====================
 stages_dict = {
     "原料IQC": "原料",
     "製程IPQC": "製程",
@@ -417,7 +416,7 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
         else:
             st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
 
-# 後方以 st.empty 佔位（包含 2 個額外空白欄位總共補齊至 9 個空間）
+# 後方以 st.empty 佔位（補足 2 個空白欄位讓按鈕縮小並維持一致）
 for ghost_idx in range(len(stages_dict), 9):
     with cols_stage[ghost_idx + 1]:
         st.empty()
