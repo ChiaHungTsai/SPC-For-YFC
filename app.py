@@ -117,7 +117,7 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 按鈕大小設定：固定寬度 125px 符合「矽碳課-碳酸鉀」長度 */
+    /* 按鈕大小設定：固定寬度 125px 符合「矽碳課-碳酸鉀」 */
     .stButton > button {
         width: 125px !important;
         min-width: 125px !important;
@@ -128,6 +128,21 @@ st.markdown("""
         min-height: 36px !important;
         max-height: 36px !important;
         white-space: nowrap !important;
+    }
+    
+    /* 讓按鈕群組水平排在同一列，且保有固定、相等的間距，絕不重疊 */
+    div.row-button-container {
+        display: flex;
+        flex-direction: row;
+        gap: 12px;
+        align-items: center;
+        height: 36px;
+        flex-wrap: nowrap;
+        width: 100%;
+    }
+    div.row-button-container > div {
+        width: auto !important;
+        flex: none !important;
     }
     
     .refresh-btn-fixed {
@@ -324,13 +339,9 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域網格與按鈕列配置 ====================
-# 主選單網格比例 (左側標籤固定為 0.7，確保所有行完美對齊)
+# ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid) ====================
+# [標籤欄(0.7), 下拉/選單欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(0.9), 剩餘空白(0.6)]
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
-
-# 按鈕專用網格比例：左側標籤(0.7)、7個按鈕等寬欄位(各用 0.4)、右側保留空白餘白以確保按鈕靠左且不被拉伸
-unit_grid_weights = [0.7, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 3.4]
-stage_grid_weights = [0.7, 0.4, 0.4, 0.4, 0.4, 5.2]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -354,12 +365,14 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-cols_unit = st.columns(unit_grid_weights)
+cols_unit = st.columns(master_grid_weights)
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
-for i, unit in enumerate(fixed_units_list):
-    with cols_unit[i + 1]:
+with cols_unit[1]:
+    # 透過 Fragment/HTML 容器包覆按鈕，讓 CSS Flexbox 控制橫向並排與間距
+    st.markdown('<div class="row-button-container">', unsafe_allow_html=True)
+    for unit in fixed_units_list:
         has_data = unit in available_units
         is_active = (selected_unit == unit)
         if has_data:
@@ -370,6 +383,7 @@ for i, unit in enumerate(fixed_units_list):
                     st.rerun()
         else:
             st.button(unit, key=f"u_{unit}", disabled=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -403,13 +417,14 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns(stage_grid_weights)
+cols_stage = st.columns(master_grid_weights)
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
-for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
-    has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
-    with cols_stage[i + 1]:
+with cols_stage[1]:
+    st.markdown('<div class="row-button-container">', unsafe_allow_html=True)
+    for stage_label, raw_name in stages_dict.items():
+        has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
         if has_stage_data:
             is_active = (selected_stage_label == stage_label)
             if st.button(stage_label, key=f"s_{stage_label}", type="primary" if is_active else "secondary"):
@@ -419,6 +434,7 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
                     st.rerun()
         else:
             st.button(stage_label, key=f"s_{stage_label}", disabled=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
