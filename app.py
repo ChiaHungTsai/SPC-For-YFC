@@ -248,28 +248,20 @@ for rc in required_cols:
     if rc != "階段" and rc not in df.columns:
         pass
 
-# ==================== 【嚴格從結尾往回推算流水號】批號排序函數 ====================
+# ==================== 【完美對齊您的邏輯】批號結尾流水號排序函數 ====================
 def batch_sort_key(s):
     import re
     s_str = str(s).strip()
     
-    # 嚴格規則：排除結尾的英文字母（如 AC），抓取緊鄰其前方的一組連續數字作為流水號
-    match = re.search(r'(\d+)[A-Za-z]+$', s_str)
+    # 按照您的要求：從結尾開始往回判斷，排除結尾的英文字母（如 AC），抓取緊鄰其前方的那組流水號數字
+    match = re.search(r'[A-Za-z]+(\d+)[A-Za-z]+$', s_str)
     if match:
         try:
             return (0, int(match.group(1)), s_str)
         except ValueError:
             pass
             
-    # 次要規則：如果結尾剛好是純數字
-    match_pure_end = re.search(r'(\d+)$', s_str)
-    if match_pure_end:
-        try:
-            return (0, int(match_pure_end.group(1)), s_str)
-        except ValueError:
-            pass
-
-    # 保底：抓取字串中所有的數字，取最後一個
+    # 萬用備用：尋找字串中的所有數字群組，嚴格取最後一組（即結尾流水號）
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
@@ -653,7 +645,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 透過升級後的嚴格結尾流水號排序函數產生正確清單
+            # 嚴格依照結尾流水號排序
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
