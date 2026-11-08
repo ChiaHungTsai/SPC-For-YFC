@@ -117,15 +117,20 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 【關鍵修正】：全面強制鎖定所有按鈕寬度為一致的 130px，徹底解決一二排按鈕長度不一的問題 */
     .stButton > button {
-        width: 130px !important;
+        width: 100% !important;
         height: 36px !important;
         padding: 2px 6px !important;
         font-size: 13px !important;
         min-height: 36px !important;
         max-height: 36px !important;
         white-space: nowrap !important;
+    }
+    
+    /* 幽靈隱藏按鈕：完全透明且不影響點擊與排版佔位 */
+    .ghost-btn button {
+        visibility: hidden !important;
+        pointer-events: none !important;
     }
     
     .refresh-btn-fixed {
@@ -326,6 +331,9 @@ st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 # [標籤欄(0.7), 下拉/輸入框欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(1.0), 剩餘空白(0.6)]
 perfect_row_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 1.0, 0.6]
 
+# 上方一、二排按鈕採用完全相同的 9 欄框架：[標籤欄(0.7), 7個按鈕欄(各1.0), 剩餘空白(0.6)]
+button_row_weights = [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6]
+
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
     "電解課",
@@ -348,8 +356,7 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-# 使用與下方完全一致的第一欄寬度 [0.7, ...] 確保絕對切齊
-cols_unit = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.3])
+cols_unit = st.columns(button_row_weights)
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
@@ -358,17 +365,17 @@ for i, unit in enumerate(fixed_units_list):
         has_data = unit in available_units
         is_active = (selected_unit == unit)
         if has_data:
-            if st.button(unit, key=f"u_{unit}", use_container_width=False, type="primary" if is_active else "secondary"):
+            if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_unit"] != unit:
                     st.session_state["selected_unit"] = unit
                     on_unit_change()
                     st.rerun()
         else:
-            st.button(unit, key=f"u_{unit}", use_container_width=False, disabled=True)
+            st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 2. 製程階段按鈕群組 ====================
+# ==================== 2. 製程階段按鈕群組（加入 3 個幽靈隱藏按鈕，總數與第一排對齊成 7 個） ====================
 stages_dict = {
     "原料IQC": "原料",
     "製程IPQC": "製程",
@@ -398,22 +405,30 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 4.0])
+cols_stage = st.columns(button_row_weights)
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
+# 渲染 4 個實際的階段按鈕
 for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
     has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
     with cols_stage[i + 1]:
         if has_stage_data:
             is_active = (selected_stage_label == stage_label)
-            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, type="primary" if is_active else "secondary"):
+            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_stage"] != stage_label:
                     st.session_state["selected_stage"] = stage_label
                     on_stage_change()
                     st.rerun()
         else:
-            st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, disabled=True)
+            st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
+
+# 自動補上 3 個隱藏的幽靈佔位按鈕（讓第一排與第二排的寬度、間距百分之百完美對等）
+for ghost_idx in range(len(stages_dict), 7):
+    with cols_stage[ghost_idx + 1]:
+        st.markdown('<div class="ghost-btn">', unsafe_allow_html=True)
+        st.button(f"ghost_{ghost_idx}", key=f"ghost_{ghost_idx}", disabled=True, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -459,13 +474,13 @@ is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
-        if st.button("全選", key="btn_select_all", use_container_width=False, disabled=is_all_selected):
+        if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
             st.session_state["current_spec"] = raw_specs_list.copy()
             st.rerun()
 
 with cols_row3[5]:
     if len(raw_specs_list) > 0:
-        if st.button("全部取消", key="btn_deselect_all", use_container_width=False, disabled=is_none_selected):
+        if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
             st.session_state["current_spec"] = []
             st.rerun()
 
