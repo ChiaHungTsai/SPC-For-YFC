@@ -130,7 +130,7 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 使用 Flexbox 讓按鈕在同一列橫向排列、保持 12px 相等間距、絕不重疊 */
+    /* 透過 Flexbox 確保按鈕在同一列橫向排列、絕不換行、保有 12px 相等間距 */
     div.row-button-container {
         display: flex !important;
         flex-direction: row !important;
@@ -141,7 +141,6 @@ st.markdown("""
         width: 100% !important;
     }
     
-    /* 覆蓋 Streamlit 自動生成的行內區塊限制 */
     div.row-button-container > div {
         width: auto !important;
         flex: 0 0 auto !important;
