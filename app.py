@@ -128,6 +128,15 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
+    /* 一二排按鈕統一縮短為剛好容納「矽碳課-碳酸鉀」的寬度 */
+    .uniform-btn-row .stButton > button {
+        width: 135px !important;
+        min-width: 135px !important;
+        max-width: 135px !important;
+        padding: 2px 4px !important;
+        font-size: 12px !important;
+    }
+    
     .refresh-btn-fixed {
         margin-top: 4px; 
     }
@@ -323,10 +332,7 @@ with header_cols[1]:
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid & Button Row) ====================
-# [標籤欄(0.7), 下拉/選單欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(0.9), 剩餘空白(0.6)]
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
-
-# 上方按鈕列專用網格：第一欄強制為 0.7 與下方完全對齊，後方 7 顆按鈕分配適當寬度，最後留白
 button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -351,6 +357,7 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
+st.markdown('<div class="uniform-btn-row">', unsafe_allow_html=True)
 cols_unit = st.columns(button_row_weights)
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
@@ -367,6 +374,7 @@ for i, unit in enumerate(fixed_units_list):
                     st.rerun()
         else:
             st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -400,6 +408,7 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
+st.markdown('<div class="uniform-btn-row">', unsafe_allow_html=True)
 cols_stage = st.columns(button_row_weights)
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
@@ -416,6 +425,7 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
                     st.rerun()
         else:
             st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -560,7 +570,6 @@ if "end_date" not in st.session_state:
 if st.session_state["start_date"] > st.session_state["end_date"]:
     st.session_state["start_date"] = st.session_state["end_date"]
 
-# 凡立水課的 IPQC、FQC、OQC 強制使用批號模式
 is_fanlishui_batch_mode = (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"])
 has_valid_dates = not is_fanlishui_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
@@ -707,7 +716,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             return "超出規格範圍"
         elif control_violate:
             return "超出管制範圍"
-        return "正常"
+        return "Normal"
 
     clean_data["異常狀況"] = values.apply(check_anomaly)
 
@@ -1006,7 +1015,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     )
     st.plotly_chart(fig, use_container_width=True, key="spc_main_chart")
 
-    abnormal_df = clean_data[clean_data["異常狀況"] != "正常"].copy()
+    abnormal_df = clean_data[clean_data["異常狀況"] != "Normal"].copy()
     
     if len(abnormal_df) > 0:
         spec_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出規格範圍"])
@@ -1057,7 +1066,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
 
     with st.expander("點此查看該項目的完整歷史數據明細"):
-        st.dataframe(clean_data.drop(columns=["_dt", "_x_val", "測定值_str", "_x_num_idx"], errors="ignore"), use_container_width=True, key="history_data_table")
+        st.dataframe(clean_data.drop(columns=["_dt", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
         
 elif len(raw_specs_list) > 0 and len(selected_specs) > 0:
     st.warning("該篩選條件下沒有對應的數據。")
