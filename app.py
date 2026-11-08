@@ -321,15 +321,15 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 唯一全域絕對對齊的主網格框架 (Master Grid) ====================
-# [標籤欄(0.7), 樣品/分析選單欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(0.9), 剩餘空白(0.6)]
+# ==================== 統一全域絕對對齊的主網格框架 (Master Grid) ====================
+# 第一欄嚴格統一為 0.7，確保所有行（製造單位、製程階段、樣品名稱、分析項目）100% 絕對切齊！
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
-# 為了讓上方按鈕列與下方選單列「百分之百絕對切齊」，按鈕列強制對應相同的 7 個欄位大區塊：
-# [標籤欄(0.7), 7個按鈕的容器欄(總寬度 3.0 對應選單欄，內部平均分配讓按鈕縮小並等寬), 後方留白(等同右側區塊總和 0.8+2.5+0.9+0.9+0.6 = 5.7)]
-# 這樣上方按鈕區塊的總寬度與下方完全一致，第一欄標籤保證 100% 絕對切齊！
+# 上方按鈕列專用網格：與下方主網格完全對應的 7 欄配置
+# [標籤欄(0.7), 按鈕區塊容器欄(3.0)，後方對應下方剩餘寬度區塊總和(5.7)]
 button_container_weights = [0.7, 3.0, 5.7]
 
+# ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
     "電解課",
     "矽碳課-矽膠",
@@ -351,7 +351,6 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-# ==================== 1. 製造單位按鈕群組 ====================
 cols_unit_outer = st.columns(button_container_weights)
 with cols_unit_outer[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
