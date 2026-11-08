@@ -130,22 +130,21 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 讓按鈕與按鈕之間的欄位保有適當且相等的間距，且不換行 */
-    div[data-testid="column"] {
-        flex: 0 0 auto !important;
-        width: auto !important;
-        min-width: unset !important;
-        padding-left: 6px !important;
-        padding-right: 6px !important;
+    /* 使用 Flexbox 讓按鈕在同一列橫向排列、保持 12px 相等間距、絕不重疊 */
+    div.row-button-container {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 12px !important;
+        align-items: center !important;
+        height: 36px !important;
+        flex-wrap: nowrap !important;
+        width: 100% !important;
     }
     
-    div.row-button-container {
-        display: flex;
-        flex-direction: row;
-        gap: 12px;
-        align-items: center;
-        height: 36px;
-        flex-wrap: nowrap;
+    /* 覆蓋 Streamlit 自動生成的行內區塊限制 */
+    div.row-button-container > div {
+        width: auto !important;
+        flex: 0 0 auto !important;
     }
     
     .refresh-btn-fixed {
@@ -373,19 +372,17 @@ with cols_unit[0]:
 
 with cols_unit[1]:
     st.markdown('<div class="row-button-container">', unsafe_allow_html=True)
-    unit_cols = st.columns(len(fixed_units_list))
-    for i, unit in enumerate(fixed_units_list):
-        with unit_cols[i]:
-            has_data = unit in available_units
-            is_active = (selected_unit == unit)
-            if has_data:
-                if st.button(unit, key=f"u_{unit}", type="primary" if is_active else "secondary"):
-                    if st.session_state["selected_unit"] != unit:
-                        st.session_state["selected_unit"] = unit
-                        on_unit_change()
-                        st.rerun()
-            else:
-                st.button(unit, key=f"u_{unit}", disabled=True)
+    for unit in fixed_units_list:
+        has_data = unit in available_units
+        is_active = (selected_unit == unit)
+        if has_data:
+            if st.button(unit, key=f"u_{unit}", type="primary" if is_active else "secondary"):
+                if st.session_state["selected_unit"] != unit:
+                    st.session_state["selected_unit"] = unit
+                    on_unit_change()
+                    st.rerun()
+        else:
+            st.button(unit, key=f"u_{unit}", disabled=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
@@ -426,19 +423,17 @@ with cols_stage[0]:
 
 with cols_stage[1]:
     st.markdown('<div class="row-button-container">', unsafe_allow_html=True)
-    stage_cols = st.columns(len(stages_dict))
-    for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
+    for stage_label, raw_name in stages_dict.items():
         has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
-        with stage_cols[i]:
-            if has_stage_data:
-                is_active = (selected_stage_label == stage_label)
-                if st.button(stage_label, key=f"s_{stage_label}", type="primary" if is_active else "secondary"):
-                    if st.session_state["selected_stage"] != stage_label:
-                        st.session_state["selected_stage"] = stage_label
-                        on_stage_change()
-                        st.rerun()
-            else:
-                st.button(stage_label, key=f"s_{stage_label}", disabled=True)
+        if has_stage_data:
+            is_active = (selected_stage_label == stage_label)
+            if st.button(stage_label, key=f"s_{stage_label}", type="primary" if is_active else "secondary"):
+                if st.session_state["selected_stage"] != stage_label:
+                    st.session_state["selected_stage"] = stage_label
+                    on_stage_change()
+                    st.rerun()
+        else:
+            st.button(stage_label, key=f"s_{stage_label}", disabled=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
