@@ -127,7 +127,7 @@ st.markdown("""
         white-space: nowrap !important;
     }
 
-    /* 針對製造單位與製程階段按鈕群組：寬度依文字自適應且等高，並靠左對齊 */
+    /* 針對製造單位與製程階段按鈕群組：寬度依文字自適應且靠左對齊 */
     .compact-btn-row div.stButton > button {
         width: auto !important;
         min-width: 95px !important;
@@ -323,11 +323,11 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 網格寬度配置 ====================
+# ==================== 網格寬度配置 (統一對齊) ====================
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
-# 讓製造單位與製程階段按鈕群組靠左緊湊排列的欄位比重分配
-unit_stage_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 3.5]
+# 讓製造單位與製程階段按鈕群組的欄位權重與下方 master_grid_weights 完全一致 [0.7, 3.0, ...]
+unit_stage_weights = [0.7, 3.0, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
