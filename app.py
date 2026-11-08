@@ -117,7 +117,7 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 按鈕大小舒適，完整顯示文字絕不截斷 */
+    /* 預設按鈕大小 */
     .stButton > button {
         width: 100% !important;
         height: 36px !important;
@@ -128,12 +128,12 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 一二排按鈕統一縮短為剛好容納「矽碳課-碳酸鉀」的寬度 */
+    /* 一二排按鈕寬度對齊第三列的「全選／全部取消」按鈕寬度 */
     .uniform-btn-row .stButton > button {
-        width: 135px !important;
-        min-width: 135px !important;
-        max-width: 135px !important;
-        padding: 2px 4px !important;
+        width: 95px !important;
+        min-width: 95px !important;
+        max-width: 95px !important;
+        padding: 2px 2px !important;
         font-size: 12px !important;
     }
     
@@ -333,7 +333,7 @@ st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid & Button Row) ====================
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
-button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
+button_row_weights = [0.7, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 2.0]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
