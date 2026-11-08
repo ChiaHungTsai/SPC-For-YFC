@@ -781,10 +781,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     fig = go.Figure()
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
-        # 使用完全避開紅色/橘色/綠色的高識別度工業色系（深藍、青綠、琥珀、深紫、洋紅等）
+        # 嚴格避開紅色、橘色系，採用高辨識度且彼此分開的工業色系（深黑藍、明亮藍、青綠、琥珀、深紫、亮青等）
         color_palette = [
             '#0f172a', '#0284c7', '#0d9488', '#d97706', '#7c3aed',
-            '#db2777', '#4f46e5', '#65a30d', '#9333ea', '#ca8a04'
+            '#2563eb', '#4f46e5', '#65a30d', '#9333ea', '#ca8a04'
         ]
         
         for idx, sub_spec in enumerate(selected_specs):
@@ -884,7 +884,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 elif is_ctrl:
                     m_col, m_sym, m_sz = '#f97316', 'circle', 8
                 else:
-                    m_col, m_sym, m_sz = '#0284c7', 'circle', 6  # 使用明亮藍色，與紅綠橘界線徹底區隔
+                    m_col, m_sym, m_sz = '#0284c7', 'circle', 6  # 使用明亮藍色
                     
                 plot_x.append(curr_dt)
                 plot_y.append(curr_val)
