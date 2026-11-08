@@ -8,7 +8,7 @@ from datetime import date, timedelta
 # 1. 網頁基本設定 (寬螢幕、隱藏側邊欄)
 st.set_page_config(page_title="義芳化學品保科 - SPC 統計製程管制儀表板", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 自訂 CSS
+# 2. 自訂 CSS（統一對齊與按鈕樣式）
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {display: none;}
@@ -117,8 +117,9 @@ st.markdown("""
         white-space: nowrap;
     }
     
+    /* 按鈕固定精緻寬度，拒絕變形 */
     .stButton > button {
-        width: 100% !important;
+        width: 120px !important;
         height: 36px !important;
         padding: 2px 6px !important;
         font-size: 13px !important;
@@ -322,8 +323,8 @@ with header_cols[1]:
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域精準對齊的 8 欄網格比例配置 ====================
-# [標籤欄, 下拉/按鈕欄1, 間距欄, 下拉/按鈕欄2, 下拉/按鈕欄3, 按鈕A, 按鈕B, 剩餘空白]
-unified_row_weights = [0.7, 3.2, 0.45, 0.8, 1.9, 0.85, 0.85, 0.85]
+# [標籤欄, 主輸入框欄, 間距欄, 次輸入框欄, 下拉選單欄, 按鈕A欄, 按鈕B欄, 剩餘空白]
+unified_row_weights = [0.8, 3.2, 0.5, 0.9, 1.8, 0.9, 0.9, 1.2]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -347,13 +348,12 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-cols_unit = st.columns(unified_row_weights)
+cols_unit = st.columns([0.8, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.5])
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
 for i, unit in enumerate(fixed_units_list):
-    col_idx = (i % 7) + 1  # 依序放入欄位 1 到 7
-    with cols_unit[col_idx]:
+    with cols_unit[i + 1]:
         has_data = unit in available_units
         is_active = (selected_unit == unit)
         if has_data:
@@ -397,7 +397,7 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns(unified_row_weights)
+cols_stage = st.columns([0.8, 1.1, 1.1, 1.1, 1.1, 4.9])
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
@@ -456,13 +456,13 @@ elif len(raw_specs_list) == 1:
 is_all_selected = len(raw_specs_list) > 0 and set(st.session_state.get("current_spec", [])) == set(raw_specs_list)
 is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
-with cols_row3[6]:
+with cols_row3[5]:
     if len(raw_specs_list) > 0:
         if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
             st.session_state["current_spec"] = raw_specs_list.copy()
             st.rerun()
 
-with cols_row3[7]:
+with cols_row3[6]:
     if len(raw_specs_list) > 0:
         if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
             st.session_state["current_spec"] = []
@@ -501,7 +501,7 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單（長度與上方樣品名稱完全一致） ====================
+# ==================== 4. 分析項目下拉選單（長度與上方樣品名稱絕對對等） ====================
 cols_param = st.columns(unified_row_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
@@ -562,7 +562,7 @@ is_fanlishui_batch_mode = (selected_unit == "凡立水課" and selected_stage_la
 has_valid_dates = not is_fanlishui_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
-    cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
+    cols_val5 = st.columns([0.8, 0.35, 1.3, 0.45, 1.3, 4.2])
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗日期</div>', unsafe_allow_html=True)
     with cols_val5[1]:
