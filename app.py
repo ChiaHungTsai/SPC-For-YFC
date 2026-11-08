@@ -130,7 +130,7 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 終極 Flexbox 容器：強制所有按鈕橫向並排、不換行、間距 12px、垂直置中 */
+    /* 核心修正：強制讓所有按鈕在同一行水平並排、不換行、間距 12px */
     .row-button-flex {
         display: flex !important;
         flex-direction: row !important;
@@ -139,12 +139,6 @@ st.markdown("""
         align-items: center !important;
         height: 36px !important;
         width: 100% !important;
-    }
-    
-    /* 覆寫 Streamlit 預設包在按鈕外層的 div 屬性，避免干擾 Flexbox */
-    .row-button-flex > div {
-        width: auto !important;
-        flex: 0 0 auto !important;
     }
     
     .refresh-btn-fixed {
@@ -342,6 +336,7 @@ with header_cols[1]:
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid) ====================
+# [標籤欄(0.7), 下拉/選單欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(0.9), 剩餘空白(0.6)]
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -371,6 +366,7 @@ with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
 with cols_unit[1]:
+    # 使用純 HTML Flexbox 容器，直接在迴圈內生成按鈕，確保完美橫向並排、不換行、有間距
     st.markdown('<div class="row-button-flex">', unsafe_allow_html=True)
     for unit in fixed_units_list:
         has_data = unit in available_units
