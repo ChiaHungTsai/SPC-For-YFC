@@ -117,8 +117,9 @@ st.markdown("""
         white-space: nowrap;
     }
     
+    /* 【關鍵修正】：強制鎖定所有按鈕寬度為 135px，確保一、二排及下方按鈕長度百分之百一致 */
     .stButton > button {
-        width: 100% !important;
+        width: 135px !important;
         height: 36px !important;
         padding: 2px 6px !important;
         font-size: 13px !important;
@@ -321,9 +322,9 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 唯一全域絕對對齊的黃金網格比例配置 ====================
-# 第一欄（標籤欄）全面強制使用 0.7，確保所有排版列的左側起點 100% 完美對齊！
-global_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 1.0, 0.6]
+# ==================== 統一全域絕對對齊的黃金網格比例配置 ====================
+# [標籤欄(0.7), 下拉/輸入框欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(1.0), 剩餘空白(0.6)]
+perfect_row_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 1.0, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -347,8 +348,8 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-# 使用與 global_weights 完全一致的第一欄比例 [0.7, ...]
-cols_unit = st.columns([0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.6])
+# 第一欄統一使用 0.7 寬度，確保與下方完全切齊
+cols_unit = st.columns([0.7, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 0.6])
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
@@ -357,13 +358,13 @@ for i, unit in enumerate(fixed_units_list):
         has_data = unit in available_units
         is_active = (selected_unit == unit)
         if has_data:
-            if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
+            if st.button(unit, key=f"u_{unit}", use_container_width=False, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_unit"] != unit:
                     st.session_state["selected_unit"] = unit
                     on_unit_change()
                     st.rerun()
         else:
-            st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
+            st.button(unit, key=f"u_{unit}", use_container_width=False, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -397,7 +398,7 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns([0.7, 1.1, 1.1, 1.1, 1.1, 4.4])
+cols_stage = st.columns([0.7, 1.15, 1.15, 1.15, 1.15, 4.6])
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
@@ -406,13 +407,13 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
     with cols_stage[i + 1]:
         if has_stage_data:
             is_active = (selected_stage_label == stage_label)
-            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
+            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_stage"] != stage_label:
                     st.session_state["selected_stage"] = stage_label
                     on_stage_change()
                     st.rerun()
         else:
-            st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
+            st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -423,8 +424,7 @@ products_list = sorted(products_list, key=natural_sort_key)
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-# 使用統一的 global_weights
-cols_row3 = st.columns(global_weights)
+cols_row3 = st.columns(perfect_row_weights)
 
 with cols_row3[0]:
     st.markdown('<div class="row-label">樣品名稱</div>', unsafe_allow_html=True)
@@ -502,8 +502,8 @@ with cols_row3[3]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單（套用完全相同的 global_weights，長度與樣品名稱 100% 絕對等長且絕對切齊） ====================
-cols_param = st.columns(global_weights)
+# ==================== 4. 分析項目下拉選單 ====================
+cols_param = st.columns(perfect_row_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
