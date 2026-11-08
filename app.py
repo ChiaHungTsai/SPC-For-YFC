@@ -781,7 +781,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     fig = go.Figure()
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
-        # 嚴格避開任何紅色、粉紅、橘色系，採用完全區隔的高對比色系（深藍、亮青、青綠、琥珀、深紫、藍靛等）
+        # 高辨識度且不與紅綠橘撞色的顏色陣列
         color_palette = [
             '#0f172a', '#0284c7', '#0d9488', '#d97706', '#4f46e5',
             '#2563eb', '#10b981', '#65a30d', '#9333ea', '#ca8a04'
@@ -847,12 +847,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     else:
                         marker_colors_sub.append(sub_color); marker_symbols_sub.append('circle'); marker_sizes_sub.append(6)
             
-            # 動態組裝 hovertemplate 判斷違規狀態並高亮顏色 (紅色代表規格違規、橘色代表管制違規)
+            # 精簡版懸浮視窗：當數值異常時自動以紅或橘色顯示數值
             hover_template_str = (
                 "<b>%{fullSeries.name}</b><br>"
                 + (f"{active_batch_col}: %{{x}}<br>" if active_batch_col else "日期: %{x}<br>")
-                + "測定值: %{y:" + plotly_fmt + "}<br>"
-                + "狀態: %{customdata}"
+                + "測定值: %{customdata}"
                 + "<extra></extra>"
             )
             
@@ -860,12 +859,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             for val in sub_df["測定值"]:
                 s_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
                 c_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
+                formatted_val = f"{val:{plotly_fmt}}"
                 if s_violate:
-                    custom_data_list.append("<span style='color: #dc2626; font-weight: bold;'>❌ 超出規格範圍</span>")
+                    custom_data_list.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val} ❌</span>")
                 elif c_violate:
-                    custom_data_list.append("<span style='color: #f97316; font-weight: bold;'>⚠️ 超出管制範圍</span>")
+                    custom_data_list.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val} ⚠️</span>")
                 else:
-                    custom_data_list.append("<span style='color: #10b981;'>✅ 正常</span>")
+                    custom_data_list.append(formatted_val)
 
             fig.add_trace(go.Scatter(
                 x=plot_x, y=plot_y,
@@ -933,8 +933,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         hover_template_single = (
             "<b>%{fullSeries.name}</b><br>"
             + (f"{active_batch_col}: %{{x}}<br>" if active_batch_col else "日期: %{x}<br>")
-            + "測定值: %{y:" + plotly_fmt + "}<br>"
-            + "狀態: %{customdata}"
+            + "測定值: %{customdata}"
             + "<extra></extra>"
         )
         
@@ -942,12 +941,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         for val in clean_data["測定值"]:
             s_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
             c_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
+            formatted_val = f"{val:{plotly_fmt}}"
             if s_violate:
-                custom_data_single.append("<span style='color: #dc2626; font-weight: bold;'>❌ 超出規格範圍</span>")
+                custom_data_single.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val} ❌</span>")
             elif c_violate:
-                custom_data_single.append("<span style='color: #f97316; font-weight: bold;'>⚠️ 超出管制範圍</span>")
+                custom_data_single.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val} ⚠️</span>")
             else:
-                custom_data_single.append("<span style='color: #10b981;'>✅ 正常</span>")
+                custom_data_single.append(formatted_val)
 
         fig.add_trace(go.Scatter(
             x=plot_x, y=plot_y,
