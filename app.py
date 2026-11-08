@@ -127,25 +127,26 @@ st.markdown("""
         white-space: nowrap !important;
     }
 
-    /* 關鍵修正：透過 Flexbox 容器讓製造單位與製程階段的所有按鈕大小完全一致且完美切齊下方選單 */
-    .unit-stage-container {
+    /* 完美對齊與緊密排列的按鈕群組容器 */
+    .filter-row-container {
         display: flex;
         align-items: center;
         width: 100%;
+        margin-bottom: 4px;
     }
-    .unit-stage-label-wrapper {
-        width: 70px; /* 與下方第一欄標籤寬度相符 */
+    .filter-label-col {
+        width: 70px; /* 與下方選單第一欄標籤寬度完全一致 */
         flex-shrink: 0;
     }
-    .unit-stage-buttons-wrapper {
+    .filter-buttons-col {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px; /* 緊密的按鈕間距 */
         flex-wrap: nowrap;
         flex-grow: 1;
-        padding-left: 10px; /* 與下方選單完美切齊的微調距離 */
+        padding-left: 12px; /* 與下方選單完美對齊 */
     }
-    .unit-stage-buttons-wrapper div.stButton > button {
+    .filter-buttons-col div.stButton > button {
         width: 125px !important;
         min-width: 125px !important;
         max-width: 125px !important;
@@ -365,8 +366,8 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-# 使用 Flexbox 結構包覆製造單位
-st.markdown('<div class="unit-stage-container"><div class="unit-stage-label-wrapper"><div class="row-label">製造單位</div></div><div class="unit-stage-buttons-wrapper">', unsafe_allow_html=True)
+# 使用 Flexbox 結構確保標籤與按鈕在同一列，且按鈕緊密排列
+st.markdown('<div class="filter-row-container"><div class="filter-label-col"><div class="row-label">製造單位</div></div><div class="filter-buttons-col">', unsafe_allow_html=True)
 cols_unit = st.columns(len(fixed_units_list))
 for i, unit in enumerate(fixed_units_list):
     with cols_unit[i]:
@@ -414,8 +415,8 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-# 使用 Flexbox 結構包覆製程階段
-st.markdown('<div class="unit-stage-container"><div class="unit-stage-label-wrapper"><div class="row-label">製程階段</div></div><div class="unit-stage-buttons-wrapper">', unsafe_allow_html=True)
+# 使用 Flexbox 結構確保標籤與按鈕在同一列，且按鈕緊密排列
+st.markdown('<div class="filter-row-container"><div class="filter-label-col"><div class="row-label">製程階段</div></div><div class="filter-buttons-col">', unsafe_allow_html=True)
 cols_stage = st.columns(len(stages_dict))
 for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
     has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
