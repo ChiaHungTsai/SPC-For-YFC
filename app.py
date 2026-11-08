@@ -130,20 +130,21 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 強制將按鈕列橫向並排、不換行，並精準設定 10px 間距拉開彼此距離 */
+    /* 強制設定橫向排列，並透過 column padding 拉開按鈕之間的適當間距、絕不重疊 */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
-        gap: 10px !important;
+        gap: 0px !important;
     }
     
     [data-testid="stHorizontalBlock"] > [data-testid="column"] {
         width: auto !important;
         flex: 0 0 auto !important;
         min-width: unset !important;
-        padding: 0px !important;
+        padding-left: 6px !important;
+        padding-right: 6px !important;
     }
     
     .refresh-btn-fixed {
