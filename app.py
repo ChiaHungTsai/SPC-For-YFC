@@ -117,7 +117,7 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 按鈕大小適中，完整顯示文字不卡住 */
+    /* 按鈕大小舒適，完整顯示文字絕不截斷 */
     .stButton > button {
         width: 100% !important;
         height: 36px !important;
@@ -322,12 +322,12 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域絕對對齊的 7 欄主網格框架 (Master Grid) ====================
+# ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid & Button Row) ====================
 # [標籤欄(0.7), 下拉/選單欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(0.9), 剩餘空白(0.6)]
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
-# 上方按鈕列專用網格：完全對應 7 欄位大區塊，第一欄 0.7 確保左側開頭 100% 絕對切齊
-button_container_weights = [0.7, 3.0, 5.7]
+# 上方按鈕列專用網格：第一欄強制為 0.7 與下方完全對齊，後方 7 顆按鈕分配適當寬度，最後留白
+button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -351,24 +351,22 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-cols_unit_outer = st.columns(button_container_weights)
-with cols_unit_outer[0]:
+cols_unit = st.columns(button_row_weights)
+with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
-with cols_unit_outer[1]:
-    cols_u_inner = st.columns(7)
-    for i, unit in enumerate(fixed_units_list):
-        with cols_u_inner[i]:
-            has_data = unit in available_units
-            is_active = (selected_unit == unit)
-            if has_data:
-                if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
-                    if st.session_state["selected_unit"] != unit:
-                        st.session_state["selected_unit"] = unit
-                        on_unit_change()
-                        st.rerun()
-            else:
-                st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
+for i, unit in enumerate(fixed_units_list):
+    with cols_unit[i + 1]:
+        has_data = unit in available_units
+        is_active = (selected_unit == unit)
+        if has_data:
+            if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
+                if st.session_state["selected_unit"] != unit:
+                    st.session_state["selected_unit"] = unit
+                    on_unit_change()
+                    st.rerun()
+        else:
+            st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -402,24 +400,22 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage_outer = st.columns(button_container_weights)
-with cols_stage_outer[0]:
+cols_stage = st.columns(button_row_weights)
+with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
-with cols_stage_outer[1]:
-    cols_s_inner = st.columns(7)
-    for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
-        has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
-        with cols_s_inner[i]:
-            if has_stage_data:
-                is_active = (selected_stage_label == stage_label)
-                if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
-                    if st.session_state["selected_stage"] != stage_label:
-                        st.session_state["selected_stage"] = stage_label
-                        on_stage_change()
-                        st.rerun()
-            else:
-                st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
+for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
+    has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
+    with cols_stage[i + 1]:
+        if has_stage_data:
+            is_active = (selected_stage_label == stage_label)
+            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
+                if st.session_state["selected_stage"] != stage_label:
+                    st.session_state["selected_stage"] = stage_label
+                    on_stage_change()
+                    st.rerun()
+        else:
+            st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
