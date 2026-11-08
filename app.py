@@ -117,24 +117,18 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 預設按鈕大小 */
-    .stButton > button {
-        width: 100% !important;
-        height: 36px !important;
-        padding: 2px 6px !important;
-        font-size: 13px !important;
-        min-height: 36px !important;
-        max-height: 36px !important;
-        white-space: nowrap !important;
-    }
-    
-    /* 將一二三列按鈕統一強制為 75px */
-    .uniform-btn-row .stButton > button {
+    /* 統一將一二三列按鈕寬度設為 75px，確保高度與對齊一致 */
+    .uniform-btn-row .stButton > button,
+    div[data-testid="column"] .stButton > button {
         width: 75px !important;
         min-width: 75px !important;
         max-width: 75px !important;
+        height: 36px !important;
+        min-height: 36px !important;
+        max-height: 36px !important;
         padding: 2px 2px !important;
         font-size: 11px !important;
+        white-space: nowrap !important;
     }
     
     .refresh-btn-fixed {
@@ -471,19 +465,15 @@ is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
-        st.markdown('<div class="uniform-btn-row">', unsafe_allow_html=True)
         if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
             st.session_state["current_spec"] = raw_specs_list.copy()
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
 with cols_row3[5]:
     if len(raw_specs_list) > 0:
-        st.markdown('<div class="uniform-btn-row">', unsafe_allow_html=True)
         if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
             st.session_state["current_spec"] = []
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
 with cols_row3[2]:
     st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
