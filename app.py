@@ -143,8 +143,8 @@ st.markdown("""
         width: auto !important;
         flex: 0 0 auto !important;
         min-width: unset !important;
-        padding-left: 8px !important;
-        padding-right: 8px !important;
+        padding-left: 6px !important;
+        padding-right: 6px !important;
     }
     
     .refresh-btn-fixed {
@@ -341,9 +341,15 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid) ====================
-# 將第二欄比例從 3.0 調寬為 4.5，給按鈕足夠的水平展開空間
-master_grid_weights = [0.7, 4.5, 0.8, 2.5, 0.9, 0.9, 0.6]
+# ==================== 定義不同列專屬的網格比例 ====================
+# 第一列（製造單位）：7顆按鈕，將第二欄寬度權重調大至 5.5，確保寬度充足
+unit_grid_weights = [0.7, 5.5, 0.8, 2.5, 0.9, 0.9, 0.6]
+
+# 第二列（製程階段）：4顆按鈕，將第二欄寬度權重稍微縮窄至 3.2
+stage_grid_weights = [0.7, 3.2, 0.8, 2.5, 0.9, 0.9, 0.6]
+
+# 第三列之後的主選單網格比例
+master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -367,7 +373,7 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-cols_unit = st.columns(master_grid_weights)
+cols_unit = st.columns(unit_grid_weights)
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
@@ -418,7 +424,7 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns(master_grid_weights)
+cols_stage = st.columns(stage_grid_weights)
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
