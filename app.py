@@ -130,7 +130,7 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 透過 Flexbox 確保按鈕在同一列橫向排列、絕不換行、保有 12px 相等間距 */
+    /* 強制讓按鈕群組水平排在同一行（橫向並排），且保有 12px 相等間距、絕不換行掉下去 */
     div.row-button-container {
         display: flex !important;
         flex-direction: row !important;
