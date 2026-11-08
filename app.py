@@ -130,21 +130,20 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 讓整個按鈕列排在同一行（橫向並排），且保有 12px 相等間距、絕不換行 */
-    .st-key-unit_buttons_container [data-testid="stHorizontalBlock"],
-    .st-key-stage_buttons_container [data-testid="stHorizontalBlock"] {
+    /* 強制將按鈕列橫向並排、不換行，並精準設定 10px 間距拉開彼此距離 */
+    [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
-        gap: 12px !important;
+        gap: 10px !important;
     }
     
-    .st-key-unit_buttons_container [data-testid="column"],
-    .st-key-stage_buttons_container [data-testid="column"] {
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
         width: auto !important;
         flex: 0 0 auto !important;
         min-width: unset !important;
+        padding: 0px !important;
     }
     
     .refresh-btn-fixed {
@@ -371,20 +370,19 @@ with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
 with cols_unit[1]:
-    with st.container(key="unit_buttons_container"):
-        unit_cols = st.columns(len(fixed_units_list))
-        for i, unit in enumerate(fixed_units_list):
-            with unit_cols[i]:
-                has_data = unit in available_units
-                is_active = (selected_unit == unit)
-                if has_data:
-                    if st.button(unit, key=f"u_{unit}", type="primary" if is_active else "secondary"):
-                        if st.session_state["selected_unit"] != unit:
-                            st.session_state["selected_unit"] = unit
-                            on_unit_change()
-                            st.rerun()
-                else:
-                    st.button(unit, key=f"u_{unit}", disabled=True)
+    unit_cols = st.columns(len(fixed_units_list))
+    for i, unit in enumerate(fixed_units_list):
+        with unit_cols[i]:
+            has_data = unit in available_units
+            is_active = (selected_unit == unit)
+            if has_data:
+                if st.button(unit, key=f"u_{unit}", type="primary" if is_active else "secondary"):
+                    if st.session_state["selected_unit"] != unit:
+                        st.session_state["selected_unit"] = unit
+                        on_unit_change()
+                        st.rerun()
+            else:
+                st.button(unit, key=f"u_{unit}", disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -423,20 +421,19 @@ with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
 with cols_stage[1]:
-    with st.container(key="stage_buttons_container"):
-        stage_cols = st.columns(len(stages_dict))
-        for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
-            has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
-            with stage_cols[i]:
-                if has_stage_data:
-                    is_active = (selected_stage_label == stage_label)
-                    if st.button(stage_label, key=f"s_{stage_label}", type="primary" if is_active else "secondary"):
-                        if st.session_state["selected_stage"] != stage_label:
-                            st.session_state["selected_stage"] = stage_label
-                            on_stage_change()
-                            st.rerun()
-                else:
-                    st.button(stage_label, key=f"s_{stage_label}", disabled=True)
+    stage_cols = st.columns(len(stages_dict))
+    for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
+        has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
+        with stage_cols[i]:
+            if has_stage_data:
+                is_active = (selected_stage_label == stage_label)
+                if st.button(stage_label, key=f"s_{stage_label}", type="primary" if is_active else "secondary"):
+                    if st.session_state["selected_stage"] != stage_label:
+                        st.session_state["selected_stage"] = stage_label
+                        on_stage_change()
+                        st.rerun()
+            else:
+                st.button(stage_label, key=f"s_{stage_label}", disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
