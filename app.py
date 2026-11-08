@@ -781,9 +781,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     fig = go.Figure()
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
+        # 使用完全避開紅色/橘色/綠色的高識別度工業色系（深藍、青綠、琥珀、深紫、洋紅等）
         color_palette = [
-            '#0f172a', '#0d9488', '#d97706', '#db2777', '#7c3aed',
-            '#0284c7', '#65a30d', '#9333ea', '#4f46e5', '#ca8a04'
+            '#0f172a', '#0284c7', '#0d9488', '#d97706', '#7c3aed',
+            '#db2777', '#4f46e5', '#65a30d', '#9333ea', '#ca8a04'
         ]
         
         for idx, sub_spec in enumerate(selected_specs):
@@ -883,7 +884,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 elif is_ctrl:
                     m_col, m_sym, m_sz = '#f97316', 'circle', 8
                 else:
-                    m_col, m_sym, m_sz = '#2563eb', 'circle', 6
+                    m_col, m_sym, m_sz = '#0284c7', 'circle', 6  # 使用明亮藍色，與紅綠橘界線徹底區隔
                     
                 plot_x.append(curr_dt)
                 plot_y.append(curr_val)
@@ -906,14 +907,14 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 elif is_ctrl:
                     marker_colors_list.append('#f97316'); marker_symbols_list.append('circle'); marker_sizes_list.append(8)
                 else:
-                    marker_colors_list.append('#2563eb'); marker_symbols_list.append('circle'); marker_sizes_list.append(6)
+                    marker_colors_list.append('#0284c7'); marker_symbols_list.append('circle'); marker_sizes_list.append(6)
 
         fig.add_trace(go.Scatter(
             x=plot_x, y=plot_y,
             mode='lines+markers',
             name=selected_param,
             hovertemplate="%{fullSeries.name}: %{y:" + plotly_fmt + "}<extra></extra>",
-            line=dict(color='#2563eb', width=2),
+            line=dict(color='#0284c7', width=2),  # 使用明亮藍色
             marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
             connectgaps=False
         ))
