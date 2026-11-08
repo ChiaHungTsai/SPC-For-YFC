@@ -130,11 +130,13 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 強制讓按鈕群組的內部 columns 容器在同一列橫向排列、不換行、有適當間距 */
+    /* 讓按鈕與按鈕之間的欄位保有適當且相等的間距，且不換行 */
     div[data-testid="column"] {
         flex: 0 0 auto !important;
         width: auto !important;
         min-width: unset !important;
+        padding-left: 6px !important;
+        padding-right: 6px !important;
     }
     
     div.row-button-container {
@@ -371,7 +373,6 @@ with cols_unit[0]:
 
 with cols_unit[1]:
     st.markdown('<div class="row-button-container">', unsafe_allow_html=True)
-    # 使用 Container 內部橫向排版
     unit_cols = st.columns(len(fixed_units_list))
     for i, unit in enumerate(fixed_units_list):
         with unit_cols[i]:
