@@ -130,20 +130,16 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 強制讓按鈕群組水平排在同一行（橫向並排），且保有 12px 相等間距、絕不換行掉下去 */
-    div.row-button-container {
-        display: flex !important;
-        flex-direction: row !important;
-        gap: 12px !important;
-        align-items: center !important;
-        height: 36px !important;
-        flex-wrap: nowrap !important;
-        width: 100% !important;
-    }
-    
-    div.row-button-container > div {
-        width: auto !important;
-        flex: 0 0 auto !important;
+    /* 透過 Flexbox 容器讓按鈕橫向並排、不換行、且保有 12px 相等間距 */
+    .row-button-flex {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 12px;
+        align-items: center;
+        height: 36px;
+        width: 100%;
+        overflow-x: auto;
     }
     
     .refresh-btn-fixed {
@@ -370,7 +366,9 @@ with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
 with cols_unit[1]:
-    st.markdown('<div class="row-button-container">', unsafe_allow_html=True)
+    # 使用純 HTML + CSS Flexbox 容器確保按鈕完美水平並排、間距相等、絕不換行
+    buttons_html_open = '<div class="row-button-flex">'
+    st.markdown(buttons_html_open, unsafe_allow_html=True)
     for unit in fixed_units_list:
         has_data = unit in available_units
         is_active = (selected_unit == unit)
@@ -421,7 +419,7 @@ with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
 with cols_stage[1]:
-    st.markdown('<div class="row-button-container">', unsafe_allow_html=True)
+    st.markdown('<div class="row-button-flex">', unsafe_allow_html=True)
     for stage_label, raw_name in stages_dict.items():
         has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
         if has_stage_data:
