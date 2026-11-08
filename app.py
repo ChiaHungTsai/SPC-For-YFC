@@ -130,20 +130,21 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 調整橫向排列按鈕的間距，將 gap 設為 12px 讓按鈕分開 */
+    /* 強制設定橫向並排、不換行，並拉開欄位間距確保按鈕不重疊 */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
-        gap: 12px !important;
+        gap: 0px !important;
     }
     
     [data-testid="stHorizontalBlock"] > [data-testid="column"] {
         width: auto !important;
         flex: 0 0 auto !important;
         min-width: unset !important;
-        padding: 0px !important;
+        padding-left: 8px !important;
+        padding-right: 8px !important;
     }
     
     .refresh-btn-fixed {
@@ -341,7 +342,8 @@ with header_cols[1]:
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid) ====================
-master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
+# 將第二欄比例從 3.0 調寬為 4.5，給按鈕足夠的水平展開空間
+master_grid_weights = [0.7, 4.5, 0.8, 2.5, 0.9, 0.9, 0.6]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
