@@ -117,8 +117,9 @@ st.markdown("""
         white-space: nowrap;
     }
     
+    /* 【關鍵修正】：強制鎖定所有按鈕寬度為 135px，確保一、二排及下方按鈕長度百分之百一致且不凸出 */
     .stButton > button {
-        width: 100% !important;
+        width: 135px !important;
         height: 36px !important;
         padding: 2px 6px !important;
         font-size: 13px !important;
@@ -322,8 +323,8 @@ with header_cols[1]:
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域精準對齊的 8 欄黃金網格比例配置 ====================
-# [標籤欄(0.7), 下拉/輸入框欄(2.2), 取樣點標籤欄(0.8), 取樣點選單欄(2.2), 全選按鈕欄(0.65), 全部取消按鈕欄(0.75), 剩餘空白(1.1)]
-layout_weights = [0.7, 2.2, 0.8, 2.2, 0.65, 0.75, 1.1]
+# [標籤欄, 下拉/輸入框欄, 取樣點標籤欄, 取樣點選單欄, 全選按鈕欄, 全部取消按鈕欄, 剩餘空白]
+perfect_row_weights = [0.8, 3.2, 0.8, 2.5, 0.8, 0.8, 1.4]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -347,8 +348,8 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-# 讓製造單位按鈕列也對齊 layout_weights 的第一欄標籤寬度
-cols_unit = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6])
+# 讓第一排與下方的 perfect_row_weights 第一欄完美對齊
+cols_unit = st.columns([0.8, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.0])
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
@@ -357,13 +358,13 @@ for i, unit in enumerate(fixed_units_list):
         has_data = unit in available_units
         is_active = (selected_unit == unit)
         if has_data:
-            if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
+            if st.button(unit, key=f"u_{unit}", use_container_width=False, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_unit"] != unit:
                     st.session_state["selected_unit"] = unit
                     on_unit_change()
                     st.rerun()
         else:
-            st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
+            st.button(unit, key=f"u_{unit}", use_container_width=False, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -397,7 +398,7 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 4.3])
+cols_stage = st.columns([0.8, 1.1, 1.1, 1.1, 1.1, 4.4])
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
@@ -406,13 +407,13 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
     with cols_stage[i + 1]:
         if has_stage_data:
             is_active = (selected_stage_label == stage_label)
-            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
+            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_stage"] != stage_label:
                     st.session_state["selected_stage"] = stage_label
                     on_stage_change()
                     st.rerun()
         else:
-            st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
+            st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -423,8 +424,7 @@ products_list = sorted(products_list, key=natural_sort_key)
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-# 使用統一的 layout_weights 確保這一列與下方分析項目完全等長對齊
-cols_row3 = st.columns(layout_weights)
+cols_row3 = st.columns(perfect_row_weights)
 
 with cols_row3[0]:
     st.markdown('<div class="row-label">樣品名稱</div>', unsafe_allow_html=True)
@@ -459,13 +459,13 @@ is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
-        if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
+        if st.button("全選", key="btn_select_all", use_container_width=False, disabled=is_all_selected):
             st.session_state["current_spec"] = raw_specs_list.copy()
             st.rerun()
 
 with cols_row3[5]:
     if len(raw_specs_list) > 0:
-        if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
+        if st.button("全部取消", key="btn_deselect_all", use_container_width=False, disabled=is_none_selected):
             st.session_state["current_spec"] = []
             st.rerun()
 
@@ -502,8 +502,8 @@ with cols_row3[3]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單（與上方樣品名稱下拉選單長度 100% 相同且絕對切齊） ====================
-cols_param = st.columns(layout_weights)
+# ==================== 4. 分析項目下拉選單 ====================
+cols_param = st.columns(perfect_row_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
@@ -563,7 +563,7 @@ is_fanlishui_batch_mode = (selected_unit == "凡立水課" and selected_stage_la
 has_valid_dates = not is_fanlishui_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
-    cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
+    cols_val5 = st.columns([0.8, 0.35, 1.3, 0.45, 1.3, 4.2])
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗日期</div>', unsafe_allow_html=True)
     with cols_val5[1]:
