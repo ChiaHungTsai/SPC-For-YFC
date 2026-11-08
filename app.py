@@ -127,12 +127,21 @@ st.markdown("""
         white-space: nowrap !important;
     }
 
-    /* 針對製造單位與製程階段按鈕群組：強制所有按鈕寬度完全一致，且剛好容納最長文字 */
-    .compact-btn-row div.stButton > button {
+    /* 讓上方按鈕列使用 Flexbox 彈性佈局，強制所有按鈕寬度一致且剛好貼合最長文字 */
+    .custom-btn-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: nowrap;
+    }
+    .custom-btn-group div[data-testid="stColumn"] {
+        flex: 0 0 auto !important;
+        width: auto !important;
+    }
+    .custom-btn-group div.stButton > button {
         width: 125px !important;
         min-width: 125px !important;
         max-width: 125px !important;
-        padding: 2px 4px !important;
     }
     
     .refresh-btn-fixed {
@@ -324,11 +333,9 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 網格寬度配置 (統一對齊) ====================
+# ==================== 網格寬度配置 (與下方選單完全對齊) ====================
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
-
-# 讓按鈕群組的欄位權重與下方 master_grid_weights 完全一致 [0.7, 3.0, ...]
-unit_stage_weights = [0.7, 3.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+btn_row_weights = [0.7, 3.0, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -352,8 +359,8 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-st.markdown('<div class="compact-btn-row">', unsafe_allow_html=True)
-cols_unit = st.columns(unit_stage_weights)
+st.markdown('<div class="custom-btn-group">', unsafe_allow_html=True)
+cols_unit = st.columns(btn_row_weights)
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
@@ -403,8 +410,8 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-st.markdown('<div class="compact-btn-row">', unsafe_allow_html=True)
-cols_stage = st.columns(unit_stage_weights)
+st.markdown('<div class="custom-btn-group">', unsafe_allow_html=True)
+cols_stage = st.columns([0.7, 3.0, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1])
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
