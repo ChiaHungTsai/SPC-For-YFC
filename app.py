@@ -117,11 +117,12 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 按鈕大小舒適，完整顯示文字絕不截斷 */
+    /* 修改按鈕寬度適應文字內容（對應最長字串「矽碳課-碳酸鉀」） */
     .stButton > button {
-        width: 100% !important;
+        width: auto !important;
+        min-width: 115px !important;
         height: 36px !important;
-        padding: 2px 6px !important;
+        padding: 2px 10px !important;
         font-size: 13px !important;
         min-height: 36px !important;
         max-height: 36px !important;
@@ -323,11 +324,10 @@ with header_cols[1]:
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid & Button Row) ====================
-# [標籤欄(0.7), 下拉/選單欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(0.9), 剩餘空白(0.6)]
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
-# 上方按鈕列專用網格：第一欄強制為 0.7 與下方完全對齊，後方 7 顆按鈕分配適當寬度，最後留白
-button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
+# 調整上方按鈕列的欄位比例，讓按鈕緊湊排列於左側
+button_row_weights = [0.7, 1.2, 1.2, 1.3, 1.2, 1.2, 1.1, 1.1, 2.0]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -360,13 +360,13 @@ for i, unit in enumerate(fixed_units_list):
         has_data = unit in available_units
         is_active = (selected_unit == unit)
         if has_data:
-            if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
+            if st.button(unit, key=f"u_{unit}", use_container_width=False, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_unit"] != unit:
                     st.session_state["selected_unit"] = unit
                     on_unit_change()
                     st.rerun()
         else:
-            st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
+            st.button(unit, key=f"u_{unit}", use_container_width=False, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -409,13 +409,13 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
     with cols_stage[i + 1]:
         if has_stage_data:
             is_active = (selected_stage_label == stage_label)
-            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
+            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_stage"] != stage_label:
                     st.session_state["selected_stage"] = stage_label
                     on_stage_change()
                     st.rerun()
         else:
-            st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
+            st.button(stage_label, key=f"s_{stage_label}", use_container_width=False, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -560,7 +560,6 @@ if "end_date" not in st.session_state:
 if st.session_state["start_date"] > st.session_state["end_date"]:
     st.session_state["start_date"] = st.session_state["end_date"]
 
-# 凡立水課的 IPQC、FQC、OQC 強制使用批號模式
 is_fanlishui_batch_mode = (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"])
 has_valid_dates = not is_fanlishui_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
