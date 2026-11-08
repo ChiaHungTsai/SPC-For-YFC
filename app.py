@@ -117,7 +117,7 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 按鈕大小設定：固定寬度符合「矽碳課-碳酸鉀」，取消彈性變形 */
+    /* 按鈕大小設定：固定寬度符合「矽碳課-碳酸鉀」 */
     .stButton > button {
         width: 125px !important;
         min-width: 125px !important;
@@ -130,11 +130,11 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 讓按鈕群組水平排列、間距相等 */
+    /* 讓按鈕群組橫向排列 (row)、緊密靠近且間距相等 */
     div.row-button-container {
         display: flex;
         flex-direction: row;
-        gap: 10px;
+        gap: 12px;
         align-items: center;
         height: 36px;
     }
