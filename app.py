@@ -117,9 +117,9 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 【關鍵修正】：強制鎖定所有按鈕寬度為 135px，確保一、二排及下方按鈕長度百分之百一致 */
+    /* 【關鍵修正】：全面強制鎖定所有按鈕寬度為一致的 130px，徹底解決一二排按鈕長度不一的問題 */
     .stButton > button {
-        width: 135px !important;
+        width: 130px !important;
         height: 36px !important;
         padding: 2px 6px !important;
         font-size: 13px !important;
@@ -348,8 +348,8 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-# 第一欄統一使用 0.7 寬度，確保與下方完全切齊
-cols_unit = st.columns([0.7, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 1.15, 0.6])
+# 使用與下方完全一致的第一欄寬度 [0.7, ...] 確保絕對切齊
+cols_unit = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.3])
 with cols_unit[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
@@ -398,7 +398,7 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns([0.7, 1.15, 1.15, 1.15, 1.15, 4.6])
+cols_stage = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 4.0])
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
@@ -459,13 +459,13 @@ is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
-        if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
+        if st.button("全選", key="btn_select_all", use_container_width=False, disabled=is_all_selected):
             st.session_state["current_spec"] = raw_specs_list.copy()
             st.rerun()
 
 with cols_row3[5]:
     if len(raw_specs_list) > 0:
-        if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
+        if st.button("全部取消", key="btn_deselect_all", use_container_width=False, disabled=is_none_selected):
             st.session_state["current_spec"] = []
             st.rerun()
 
