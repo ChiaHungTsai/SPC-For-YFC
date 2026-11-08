@@ -251,13 +251,10 @@ for rc in required_cols:
 # ==================== 批號排序函數 ====================
 def batch_sort_key(s):
     s_str = str(s).strip()
-    
-    # 從最末碼開始往回看：先排除所有英文字母
     i = len(s_str) - 1
     while i >= 0 and not s_str[i].isdigit():
         i -= 1
         
-    # 從這裡開始收集 3 個數字
     digits_collected = []
     while i >= 0 and len(digits_collected) < 3 and s_str[i].isdigit():
         digits_collected.append(s_str[i])
@@ -324,8 +321,11 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 1. 製造單位按鈕群組 ====================
+# ==================== 共用排版網格比例設定 ====================
 grid_weights_unit = [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.8]
+row_weights = [0.7, 2.8, 0.45, 0.8, 1.7, 0.75, 0.75, 1.1]
+
+# ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
     "電解課",
     "矽碳課-矽膠",
@@ -424,7 +424,6 @@ products_list = sorted(products_list, key=natural_sort_key)
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-row_weights = [0.7, 2.8, 0.45, 0.8, 1.7, 0.75, 0.75, 1.1]
 cols_row3 = st.columns(row_weights)
 
 with cols_row3[0]:
@@ -503,7 +502,7 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單（已與上方完全對齊） ====================
+# ==================== 4. 分析項目下拉選單（套用完全相同的 row_weights 確保絕對對齊） ====================
 cols_param = st.columns(row_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
@@ -655,7 +654,6 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            # 嚴格依照邏輯排序
             unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
