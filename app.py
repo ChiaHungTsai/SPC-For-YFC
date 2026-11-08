@@ -321,14 +321,15 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域絕對對齊的網格比例配置 (Master Grid) ====================
-# 將第一欄（標籤欄）嚴格統一為 0.7，確保所有行（製造單位、製程階段、樣品名稱、分析項目）100% 絕對切齊！
+# ==================== 唯一全域絕對對齊的主網格框架 (Master Grid) ====================
+# [標籤欄(0.7), 樣品/分析選單欄(3.0), 取樣點標籤欄(0.8), 取樣點選單欄(2.5), 全選按鈕欄(0.9), 全部取消按鈕欄(0.9), 剩餘空白(0.6)]
 master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
 
-# 上方按鈕列專用網格：第一欄 0.7，後方 9 個等寬欄位（包含 2 個縮小按鈕用的空白佔位）
-button_row_weights = [0.7, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.6]
+# 為了讓上方按鈕列與下方選單列「百分之百絕對切齊」，按鈕列強制對應相同的 7 個欄位大區塊：
+# [標籤欄(0.7), 7個按鈕的容器欄(總寬度 3.0 對應選單欄，內部平均分配讓按鈕縮小並等寬), 後方留白(等同右側區塊總和 0.8+2.5+0.9+0.9+0.6 = 5.7)]
+# 這樣上方按鈕區塊的總寬度與下方完全一致，第一欄標籤保證 100% 絕對切齊！
+button_container_weights = [0.7, 3.0, 5.7]
 
-# ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
     "電解課",
     "矽碳課-矽膠",
@@ -350,26 +351,29 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-cols_unit = st.columns(button_row_weights)
-with cols_unit[0]:
+# ==================== 1. 製造單位按鈕群組 ====================
+cols_unit_outer = st.columns(button_container_weights)
+with cols_unit_outer[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
-for i, unit in enumerate(fixed_units_list):
-    with cols_unit[i + 1]:
-        has_data = unit in available_units
-        is_active = (selected_unit == unit)
-        if has_data:
-            if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
-                if st.session_state["selected_unit"] != unit:
-                    st.session_state["selected_unit"] = unit
-                    on_unit_change()
-                    st.rerun()
-        else:
-            st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
+with cols_unit_outer[1]:
+    cols_u_inner = st.columns(7)
+    for i, unit in enumerate(fixed_units_list):
+        with cols_u_inner[i]:
+            has_data = unit in available_units
+            is_active = (selected_unit == unit)
+            if has_data:
+                if st.button(unit, key=f"u_{unit}", use_container_width=True, type="primary" if is_active else "secondary"):
+                    if st.session_state["selected_unit"] != unit:
+                        st.session_state["selected_unit"] = unit
+                        on_unit_change()
+                        st.rerun()
+            else:
+                st.button(unit, key=f"u_{unit}", use_container_width=True, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 2. 製程階段按鈕群組（與第一排共用相同的 button_row_weights，確保按鈕大小完全一致） ====================
+# ==================== 2. 製程階段按鈕群組 ====================
 stages_dict = {
     "原料IQC": "原料",
     "製程IPQC": "製程",
@@ -399,27 +403,24 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns(button_row_weights)
-with cols_stage[0]:
+cols_stage_outer = st.columns(button_container_weights)
+with cols_stage_outer[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
-for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
-    has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
-    with cols_stage[i + 1]:
-        if has_stage_data:
-            is_active = (selected_stage_label == stage_label)
-            if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
-                if st.session_state["selected_stage"] != stage_label:
-                    st.session_state["selected_stage"] = stage_label
-                    on_stage_change()
-                    st.rerun()
-        else:
-            st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
-
-# 後方以 st.empty 佔位（補足 2 個空白欄位讓按鈕縮小並維持一致）
-for ghost_idx in range(len(stages_dict), 9):
-    with cols_stage[ghost_idx + 1]:
-        st.empty()
+with cols_stage_outer[1]:
+    cols_s_inner = st.columns(7)
+    for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
+        has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
+        with cols_s_inner[i]:
+            if has_stage_data:
+                is_active = (selected_stage_label == stage_label)
+                if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
+                    if st.session_state["selected_stage"] != stage_label:
+                        st.session_state["selected_stage"] = stage_label
+                        on_stage_change()
+                        st.rerun()
+            else:
+                st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, disabled=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
