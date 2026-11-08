@@ -564,8 +564,14 @@ if "end_date" not in st.session_state:
 if st.session_state["start_date"] > st.session_state["end_date"]:
     st.session_state["start_date"] = st.session_state["end_date"]
 
-is_fanlishui_batch_mode = (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"])
-has_valid_dates = not is_fanlishui_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
+# 判斷是否為強制批號模式
+is_forced_batch_mode = (
+    (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"]) or
+    (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC") or
+    (selected_unit == "矽碳課-矽膠" and selected_stage_label == "出貨OQC")
+)
+
+has_valid_dates = not is_forced_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
     cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
@@ -649,7 +655,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
-    use_date_axis = has_valid_dates and not is_fanlishui_batch_mode and clean_data["_dt"].notna().any()
+    use_date_axis = has_valid_dates and not is_forced_batch_mode and clean_data["_dt"].notna().any()
 
     if use_date_axis:
         clean_data = clean_data.dropna(subset=["_dt"]).copy()
