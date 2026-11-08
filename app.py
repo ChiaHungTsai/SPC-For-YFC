@@ -130,21 +130,20 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 強制設定橫向並排、不換行，並拉開欄位間距確保按鈕不重疊 */
-    [data-testid="stHorizontalBlock"] {
+    /* 讓按鈕群組完美橫向並排、間距 12px、絕對不重疊 */
+    .btn-flex-row {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
-        gap: 0px !important;
+        gap: 12px !important;
+        height: 36px !important;
     }
-    
-    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+    .btn-flex-row > div {
         width: auto !important;
         flex: 0 0 auto !important;
         min-width: unset !important;
-        padding-left: 6px !important;
-        padding-right: 6px !important;
+        padding: 0px !important;
     }
     
     .refresh-btn-fixed {
@@ -341,16 +340,6 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 定義不同列專屬的網格比例 ====================
-# 第一列（製造單位）：7顆按鈕，將第二欄寬度權重調大至 5.5，確保寬度充足
-unit_grid_weights = [0.7, 5.5, 0.8, 2.5, 0.9, 0.9, 0.6]
-
-# 第二列（製程階段）：4顆按鈕，將第二欄寬度權重稍微縮窄至 3.2
-stage_grid_weights = [0.7, 3.2, 0.8, 2.5, 0.9, 0.9, 0.6]
-
-# 第三列之後的主選單網格比例
-master_grid_weights = [0.7, 3.0, 0.8, 2.5, 0.9, 0.9, 0.6]
-
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
     "電解課",
@@ -373,14 +362,15 @@ if "selected_unit" not in st.session_state or st.session_state["selected_unit"] 
 selected_unit = st.session_state["selected_unit"]
 unit_df = df[df["單位"] == selected_unit] if len(df) > 0 and "單位" in df.columns else pd.DataFrame()
 
-cols_unit = st.columns(unit_grid_weights)
-with cols_unit[0]:
+r1_cols = st.columns([1.2, 10.8])
+with r1_cols[0]:
     st.markdown('<div class="row-label">製造單位</div>', unsafe_allow_html=True)
 
-with cols_unit[1]:
-    unit_cols = st.columns(len(fixed_units_list))
+with r1_cols[1]:
+    st.markdown('<div class="btn-flex-row">', unsafe_allow_html=True)
+    u_cols = st.columns(len(fixed_units_list))
     for i, unit in enumerate(fixed_units_list):
-        with unit_cols[i]:
+        with u_cols[i]:
             has_data = unit in available_units
             is_active = (selected_unit == unit)
             if has_data:
@@ -391,6 +381,7 @@ with cols_unit[1]:
                         st.rerun()
             else:
                 st.button(unit, key=f"u_{unit}", disabled=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -424,15 +415,16 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns(stage_grid_weights)
-with cols_stage[0]:
+r2_cols = st.columns([1.2, 10.8])
+with r2_cols[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
-with cols_stage[1]:
-    stage_cols = st.columns(len(stages_dict))
+with r2_cols[1]:
+    st.markdown('<div class="btn-flex-row">', unsafe_allow_html=True)
+    s_cols = st.columns(len(stages_dict))
     for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
         has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
-        with stage_cols[i]:
+        with s_cols[i]:
             if has_stage_data:
                 is_active = (selected_stage_label == stage_label)
                 if st.button(stage_label, key=f"s_{stage_label}", type="primary" if is_active else "secondary"):
@@ -442,6 +434,7 @@ with cols_stage[1]:
                         st.rerun()
             else:
                 st.button(stage_label, key=f"s_{stage_label}", disabled=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
@@ -452,11 +445,11 @@ products_list = sorted(products_list, key=natural_sort_key)
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
-cols_row3 = st.columns(master_grid_weights)
+r3_cols = st.columns([1.2, 4.5, 1.2, 4.1])
 
-with cols_row3[0]:
+with r3_cols[0]:
     st.markdown('<div class="row-label">樣品名稱</div>', unsafe_allow_html=True)
-with cols_row3[1]:
+with r3_cols[1]:
     selected_product = st.selectbox(
         "樣品名稱", 
         products_list if products_list else ["請先選擇製程階段"], 
@@ -485,57 +478,55 @@ elif len(raw_specs_list) == 1:
 is_all_selected = len(raw_specs_list) > 0 and set(st.session_state.get("current_spec", [])) == set(raw_specs_list)
 is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
-with cols_row3[4]:
-    if len(raw_specs_list) > 0:
-        if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
-            st.session_state["current_spec"] = raw_specs_list.copy()
-            st.rerun()
-
-with cols_row3[5]:
-    if len(raw_specs_list) > 0:
-        if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
-            st.session_state["current_spec"] = []
-            st.rerun()
-
-with cols_row3[2]:
+with r3_cols[2]:
     st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
 
-with cols_row3[3]:
-    if len(raw_specs_list) > 0:
-        selected_specs = st.multiselect(
-            "取樣點/規格",
-            options=raw_specs_list,
-            key="current_spec",
-            on_change=on_spec_change,
-            label_visibility="collapsed"
-        )
-        
-        selected_specs = [s for s in raw_specs_list if s in selected_specs]
-        
-        if len(selected_specs) > 0:
-            spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_specs)]
+with r3_cols[3]:
+    sub_r3 = st.columns([2.5, 0.8, 0.8])
+    with sub_r3[0]:
+        if len(raw_specs_list) > 0:
+            selected_specs = st.multiselect(
+                "取樣點/規格",
+                options=raw_specs_list,
+                key="current_spec",
+                on_change=on_spec_change,
+                label_visibility="collapsed"
+            )
+            selected_specs = [s for s in raw_specs_list if s in selected_specs]
+            if len(selected_specs) > 0:
+                spec_df = prod_df[prod_df["取樣點/規格"].astype(str).str.strip().isin(selected_specs)]
+            else:
+                spec_df = prod_df.iloc[0:0]
         else:
-            spec_df = prod_df.iloc[0:0]
-    else:
-        selected_specs = []
-        spec_df = prod_df
-        st.multiselect(
-            "取樣點/規格",
-            options=["無取樣點/規格資料"],
-            default=["無取樣點/規格資料"],
-            disabled=True,
-            key="sel_spec_disabled",
-            label_visibility="collapsed"
-        )
+            selected_specs = []
+            spec_df = prod_df
+            st.multiselect(
+                "取樣點/規格",
+                options=["無取樣點/規格資料"],
+                default=["無取樣點/規格資料"],
+                disabled=True,
+                key="sel_spec_disabled",
+                label_visibility="collapsed"
+            )
+    with sub_r3[1]:
+        if len(raw_specs_list) > 0:
+            if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
+                st.session_state["current_spec"] = raw_specs_list.copy()
+                st.rerun()
+    with sub_r3[2]:
+        if len(raw_specs_list) > 0:
+            if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
+                st.session_state["current_spec"] = []
+                st.rerun()
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
 # ==================== 4. 分析項目下拉選單 ====================
-cols_param = st.columns(master_grid_weights)
-with cols_param[0]:
+r4_cols = st.columns([1.2, 4.5, 6.0])
+with r4_cols[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
-with cols_param[1]:
+with r4_cols[1]:
     if len(raw_specs_list) == 0 or len(selected_specs) > 0:
         params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
         params_list = sorted(params_list, key=natural_sort_key)
@@ -590,12 +581,12 @@ is_fanlishui_batch_mode = (selected_unit == "凡立水課" and selected_stage_la
 has_valid_dates = not is_fanlishui_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
-    cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
-    with cols_val5[0]:
+    r5_cols = st.columns([1.2, 0.4, 1.8, 0.4, 1.8, 3.4])
+    with r5_cols[0]:
         st.markdown('<div class="row-label">檢驗日期</div>', unsafe_allow_html=True)
-    with cols_val5[1]:
+    with r5_cols[1]:
         st.markdown('<div class="inline-sub-label">開始</div>', unsafe_allow_html=True)
-    with cols_val5[2]:
+    with r5_cols[2]:
         start_date = st.date_input(
             "起始日期", 
             value=st.session_state["start_date"], 
@@ -605,9 +596,9 @@ if has_valid_dates:
         )
         st.session_state["start_date"] = start_date
 
-    with cols_val5[3]:
+    with r5_cols[3]:
         st.markdown('<div class="inline-sub-label">結束</div>', unsafe_allow_html=True)
-    with cols_val5[4]:
+    with r5_cols[4]:
         end_date = st.date_input(
             "結束日期", 
             value=st.session_state["end_date"], 
