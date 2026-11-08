@@ -321,9 +321,9 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 共用排版網格比例設定 ====================
+# ==================== 統一對齊的網格比例定義 ====================
+# [標籤欄, 按鈕1, 按鈕2, 按鈕3, 按鈕4, 按鈕5, 按鈕6, 按鈕7, 剩餘空白]
 grid_weights_unit = [0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.8]
-row_weights = [0.7, 2.8, 0.45, 0.8, 1.7, 0.75, 0.75, 1.1]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -366,7 +366,7 @@ for i, unit in enumerate(fixed_units_list):
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 2. 製程階段按鈕群組 ====================
+# ==================== 2. 製程階段按鈕群組（對齊第一欄與後續按鈕欄寬） ====================
 stages_dict = {
     "原料IQC": "原料",
     "製程IPQC": "製程",
@@ -397,7 +397,8 @@ if len(unit_df) > 0 and "階段" in unit_df.columns:
 else:
     stage_df = unit_df
 
-cols_stage = st.columns([0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 3.8])
+# 將製程階段的欄位比例與上方製造單位完全對齊 (共 9 欄)
+cols_stage = st.columns(grid_weights_unit)
 with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
@@ -424,6 +425,8 @@ products_list = sorted(products_list, key=natural_sort_key)
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
+# 樣品名稱列的專屬比例 (對應上下對齊)
+row_weights = [0.7, 2.8, 0.45, 0.8, 1.7, 0.75, 0.75, 1.1]
 cols_row3 = st.columns(row_weights)
 
 with cols_row3[0]:
@@ -1023,7 +1026,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             "LCL": "管制下限 (LCL)"
         }
         
-        display_cols = [c for c in ["異常狀況", active_batch_col, "檢驗日期", "測定值", "USL", "LSL", "UCL", "LCL"] if c in abnormal_df.columns or c == "異常狀況"]
+        display_cols = [c for c in ["異常狀況", active_batch_col, "檢驗日期", "測定值", "USL", "LSL", "UCL", "LCL"] if c in abnormal_df.columns or c == "異常選單" or c == "異常狀況"]
         
         table_html = '<table class="custom-alert-table"><thead><tr>'
         for col in display_cols:
