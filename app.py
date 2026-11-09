@@ -455,19 +455,13 @@ raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).
 
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
-if len(raw_specs_list) > 1:
-    if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
-        st.session_state["current_spec"] = []
-    else:
-        st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
-elif len(raw_specs_list) == 1:
-    if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
-        st.session_state["current_spec"] = raw_specs_list.copy()
-    else:
-        st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
+if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
+    st.session_state["current_spec"] = []
 
-is_all_selected = len(raw_specs_list) > 0 and set(st.session_state.get("current_spec", [])) == set(raw_specs_list)
-is_none_selected = len(st.session_state.get("current_spec", [])) == 0
+st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
+
+is_all_selected = len(raw_specs_list) > 0 and set(st.session_state["current_spec"]) == set(raw_specs_list)
+is_none_selected = len(st.session_state["current_spec"]) == 0
 
 with cols_row3[2]:
     st.markdown(f'<div class="row-label">{spec_label_text}</div>', unsafe_allow_html=True)
@@ -732,7 +726,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         date_str_range = "全批號區間"
 
-    # 組裝規格/取樣點顯示字串
     spec_display_part = f" ➔ <span style='color: #dc2626;'>{' / '.join(selected_specs)}</span>" if selected_specs else ""
 
     summary_title_html = f"""
