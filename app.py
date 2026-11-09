@@ -711,7 +711,17 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         cpk = 0.0
 
+    is_multi_spec_fanlishui = (
+        selected_unit == "凡立水課" and 
+        selected_stage_label in ["製程IPQC", "成品FQC"] and 
+        len(selected_specs) > 1
+    )
+
     def check_anomaly(val):
+        # 凡立水 IPQC/FQC 多選模式下不進行超規/超管判定
+        if is_multi_spec_fanlishui:
+            return "Normal"
+            
         spec_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
         control_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
         
@@ -784,12 +794,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     st.markdown(chart_title_html, unsafe_allow_html=True)
 
     fig = go.Figure()
-    
-    is_multi_spec_fanlishui = (
-        selected_unit == "凡立水課" and 
-        selected_stage_label in ["製程IPQC", "成品FQC"] and 
-        len(selected_specs) > 1
-    )
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
