@@ -655,7 +655,7 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             active_batch_col = candidate
             break
 
-    use_date_axis = has_valid_dates and not is_fanlishui_batch_mode and clean_data["_dt"].notna().any()
+    use_date_axis = has_valid_dates and not is_forced_batch_mode and clean_data["_dt"].notna().any()
 
     if use_date_axis:
         clean_data = clean_data.dropna(subset=["_dt"]).copy()
@@ -708,7 +708,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         cpk = 0.0
 
-    # 嚴格依照 SPC 邏輯判定超規與超管
     def check_anomaly(val):
         spec_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
         control_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
@@ -814,7 +813,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                             m_sizes.append(0)
                             custom_data.append("")
                     
-                    # 嚴格使用變數判定，確保標記點與懸浮數值高亮邏輯 100% 一致
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                     is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
                     
@@ -1084,7 +1082,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         spec_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出規格範圍"])
         control_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出管制範圍"])
         
-        # 計算總筆數與超規、超管百分比
         total_count = len(clean_data)
         spec_pct = (spec_count / total_count * 100) if total_count > 0 else 0.0
         control_pct = (control_count / total_count * 100) if total_count > 0 else 0.0
