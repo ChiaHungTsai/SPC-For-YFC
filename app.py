@@ -329,8 +329,8 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域絕對對齊的 7 欄網格框架 (Master Grid & Button Row) ====================
-master_grid_weights = [0.7, 2.5, 0.8, 2.5, 1.4, 0.9, 0.6]
+# ==================== 統一全域網格框架配置 (將 3 個下拉選單寬度統一設為 2.7) ====================
+master_grid_weights = [0.7, 2.7, 0.8, 2.7, 0.5, 0.9, 0.6]
 button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -469,18 +469,6 @@ elif len(raw_specs_list) == 1:
 is_all_selected = len(raw_specs_list) > 0 and set(st.session_state.get("current_spec", [])) == set(raw_specs_list)
 is_none_selected = len(st.session_state.get("current_spec", [])) == 0
 
-with cols_row3[4]:
-    if len(raw_specs_list) > 0:
-        if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
-            st.session_state["current_spec"] = raw_specs_list.copy()
-            st.rerun()
-
-with cols_row3[5]:
-    if len(raw_specs_list) > 0:
-        if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
-            st.session_state["current_spec"] = []
-            st.rerun()
-
 with cols_row3[2]:
     st.markdown(f'<div class="row-label">{spec_label_text}</div>', unsafe_allow_html=True)
 
@@ -512,9 +500,22 @@ with cols_row3[3]:
             label_visibility="collapsed"
         )
 
+# 批次選取全選/全部取消按鈕
+with cols_row3[5]:
+    if len(raw_specs_list) > 0:
+        b_cols = st.columns(2)
+        with b_cols[0]:
+            if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
+                st.session_state["current_spec"] = raw_specs_list.copy()
+                st.rerun()
+        with b_cols[1]:
+            if st.button("全消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
+                st.session_state["current_spec"] = []
+                st.rerun()
+
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 ====================
+# ==================== 4. 分析項目下拉選單 (寬度與上方對齊 2.7) ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
@@ -731,9 +732,12 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         date_str_range = "全批號區間"
 
+    # 組裝規格/取樣點顯示字串
+    spec_display_part = f" ➔ <span style='color: #dc2626;'>{' / '.join(selected_specs)}</span>" if selected_specs else ""
+
     summary_title_html = f"""
     <div class="highlight-title-box">
-        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part if 'spec_display_part' in locals() else ""} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
     </div>
     """
     st.markdown(summary_title_html, unsafe_allow_html=True)
@@ -779,7 +783,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     chart_title_html = f"""
     <div class="highlight-title-box">
-        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part if 'spec_display_part' in locals() else ""} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
     </div>
     """
     st.markdown(chart_title_html, unsafe_allow_html=True)
