@@ -781,7 +781,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     fig = go.Figure()
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
-        # 高辨識度且不與紅綠橘撞色的顏色陣列
         color_palette = [
             '#0f172a', '#0284c7', '#0d9488', '#d97706', '#4f46e5',
             '#2563eb', '#10b981', '#65a30d', '#9333ea', '#ca8a04'
@@ -847,11 +846,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     else:
                         marker_colors_sub.append(sub_color); marker_symbols_sub.append('circle'); marker_sizes_sub.append(6)
             
-            # 精簡版懸浮視窗：當數值異常時自動以紅或橘色顯示數值
+            # 精簡版懸浮視窗：保留原本結構，僅對超標數值加上顏色
             hover_template_str = (
-                "<b>%{fullSeries.name}</b><br>"
-                + (f"{active_batch_col}: %{{x}}<br>" if active_batch_col else "日期: %{x}<br>")
-                + "測定值: %{customdata}"
+                "%{fullSeries.name}: %{customdata}"
                 + "<extra></extra>"
             )
             
@@ -861,9 +858,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 c_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
                 formatted_val = f"{val:{plotly_fmt}}"
                 if s_violate:
-                    custom_data_list.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val} ❌</span>")
+                    custom_data_list.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val}</span>")
                 elif c_violate:
-                    custom_data_list.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val} ⚠️</span>")
+                    custom_data_list.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val}</span>")
                 else:
                     custom_data_list.append(formatted_val)
 
@@ -931,9 +928,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     marker_colors_list.append('#0284c7'); marker_symbols_list.append('circle'); marker_sizes_list.append(6)
 
         hover_template_single = (
-            "<b>%{fullSeries.name}</b><br>"
-            + (f"{active_batch_col}: %{{x}}<br>" if active_batch_col else "日期: %{x}<br>")
-            + "測定值: %{customdata}"
+            "%{fullSeries.name}: %{customdata}"
             + "<extra></extra>"
         )
         
@@ -943,9 +938,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             c_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
             formatted_val = f"{val:{plotly_fmt}}"
             if s_violate:
-                custom_data_single.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val} ❌</span>")
+                custom_data_single.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val}</span>")
             elif c_violate:
-                custom_data_single.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val} ⚠️</span>")
+                custom_data_single.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val}</span>")
             else:
                 custom_data_single.append(formatted_val)
 
