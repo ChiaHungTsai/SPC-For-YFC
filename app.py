@@ -329,8 +329,8 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域網格框架配置 (下拉選單寬度固定為 7.5，按鈕區放大 2 倍) ====================
-master_grid_weights = [0.7, 7.5, 0.8, 7.5, 1.8, 0.6]
+# ==================== 統一全域網格框架配置 (下拉選單寬度固定為 4.0，按鈕欄位放大為 3.6) ====================
+master_grid_weights = [0.7, 4.0, 0.8, 4.0, 3.6, 0.6]
 button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -506,7 +506,7 @@ with cols_row3[3]:
             label_visibility="collapsed"
         )
 
-# 全選與「全部取消」按鈕（寬度放大 2 倍）
+# 全選與「全部取消」按鈕（寬度放大為 2 倍，分配於 3.6 寬度的欄位中）
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
         b_cols = st.columns(2)
@@ -521,7 +521,7 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 (寬度固定為 7.5) ====================
+# ==================== 4. 分析項目下拉選單 (寬度固定為 4.0) ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
