@@ -329,8 +329,8 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域網格框架配置 (調整後：0.7, 3.5, 1.0, 3.5, 2.8, 0.6) ====================
-master_grid_weights = [0.7, 3.5, 1.0, 3.5, 2.8, 0.6]
+# ==================== 統一全域網格框架配置 (調整為：1.4, 3.2, 1.0, 3.2, 2.4, 1.4) ====================
+master_grid_weights = [1.4, 3.2, 1.0, 3.2, 2.4, 1.4]
 button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -519,7 +519,7 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 (寬度固定為 3.5) ====================
+# ==================== 4. 分析項目下拉選單 ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
