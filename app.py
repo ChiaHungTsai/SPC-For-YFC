@@ -256,35 +256,63 @@ for rc in required_cols:
     if rc != "階段" and rc not in df.columns:
         pass
 
-# ==================== 批號排序函數 ====================
-def batch_sort_key(s):
-    s_str = str(s).strip()
-    i = len(s_str) - 1
-    while i >= 0 and not s_str[i].isdigit():
-        i -= 1
+# ==================== 批號排序函數 (支援 YPE165 特殊規則) ====================
+def make_batch_sort_key(unit, stage):
+    def batch_sort_key(s):
+        s_str = str(s).strip()
         
-    digits_collected = []
-    while i >= 0 and len(digits_collected) < 3 and s_str[i].isdigit():
-        digits_collected.append(s_str[i])
-        i -= 1
+        # 判斷是否為「凡立水課」的「製程IPQC」或「成品FQC」且以 YPE165 開頭
+        is_ype165_mode = (
+            unit == "凡立水課" and 
+            stage in ["製程IPQC", "成品FQC"] and 
+            s_str.startswith("YPE165")
+        )
         
-    if len(digits_collected) > 0:
-        digits_collected.reverse()
-        num_str = "".join(digits_collected)
-        try:
-            return (0, int(num_str), s_str)
-        except ValueError:
-            pass
+        if is_ype165_mode:
+            import re
+            # 去掉後面的英文字母（只保留前面的數字部分或主體）
+            # 例如 YPE165A01 -> 去掉結尾英文字母 -> 抓取最後 2 碼數字作為流水號
+            base_str = re.sub(r'[a-zA-Z]+$', '', s_str)
+            digits = re.findall(r'\d+', base_str)
+            if digits:
+                full_num_str = "".join(digits)
+                if len(full_num_str) >= 2:
+                    last_two = int(full_num_str[-2:])
+                    return (0, last_two, s_str)
+                else:
+                    try:
+                        return (0, int(full_num_str), s_str)
+                    except ValueError:
+                        pass
+        
+        # 原本的通用批號排序規則
+        i = len(s_str) - 1
+        while i >= 0 and not s_str[i].isdigit():
+            i -= 1
             
-    import re
-    digits = re.findall(r'\d+', s_str)
-    if digits:
-        try:
-            return (0, int(digits[-1]), s_str)
-        except ValueError:
-            pass
+        digits_collected = []
+        while i >= 0 and len(digits_collected) < 3 and s_str[i].isdigit():
+            digits_collected.append(s_str[i])
+            i -= 1
             
-    return (1, 0, s_str)
+        if len(digits_collected) > 0:
+            digits_collected.reverse()
+            num_str = "".join(digits_collected)
+            try:
+                return (0, int(num_str), s_str)
+            except ValueError:
+                pass
+                
+        import re
+        digits = re.findall(r'\d+', s_str)
+        if digits:
+            try:
+                return (0, int(digits[-1]), s_str)
+            except ValueError:
+                pass
+                
+        return (1, 0, s_str)
+    return batch_sort_key
 
 def natural_sort_key(s):
     import re
@@ -671,7 +699,10 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
+            
+            # 使用動態綁定 unit 與 stage 的排序函數
+            current_batch_sort_func = make_batch_sort_key(selected_unit, selected_stage_label)
+            unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=current_batch_sort_func)
             
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
             clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
