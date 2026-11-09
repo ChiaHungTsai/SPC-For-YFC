@@ -105,6 +105,19 @@ st.markdown("""
         white-space: nowrap;
     }
     
+    /* 專門用來讓標題靠右對齊的樣式 */
+    .row-label-right {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e3a8a;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        height: 36px;
+        padding-right: 8px;
+        white-space: nowrap;
+    }
+    
     .inline-sub-label {
         font-size: 14px;
         font-weight: 600;
@@ -329,8 +342,8 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域網格框架配置 (調整為：1.4, 3.2, 1.0, 3.2, 2.4, 1.4) ====================
-master_grid_weights = [1.4, 3.2, 1.0, 3.2, 2.4, 1.4]
+# ==================== 統一全域網格框架配置 (調整為：1.0, 3.2, 1.4, 3.2, 2.4, 1.4) ====================
+master_grid_weights = [1.0, 3.2, 1.4, 3.2, 2.4, 1.4]
 button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -472,8 +485,9 @@ elif st.session_state.get("trigger_action") == "deselect_all":
 is_all_selected = len(raw_specs_list) > 0 and set(st.session_state["current_spec"]) == set(raw_specs_list)
 is_none_selected = len(st.session_state["current_spec"]) == 0
 
+# 將「取樣點/規格」標籤靠右對齊
 with cols_row3[2]:
-    st.markdown(f'<div class="row-label">{spec_label_text}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="row-label-right">{spec_label_text}</div>', unsafe_allow_html=True)
 
 with cols_row3[3]:
     if len(raw_specs_list) > 0:
