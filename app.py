@@ -694,10 +694,19 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
     n = len(values)
 
-    usl = float(clean_data["USL"].dropna().iloc[0]) if "USL" in clean_data.columns and len(clean_data["USL"].dropna()) > 0 else None
-    lsl = float(clean_data["LSL"].dropna().iloc[0]) if "LSL" in clean_data.columns and len(clean_data["LSL"].dropna()) > 0 else None
-    ucl = float(clean_data["UCL"].dropna().iloc[0]) if "UCL" in clean_data.columns and len(clean_data["UCL"].dropna()) > 0 else None
-    lcl = float(clean_data["LCL"].dropna().iloc[0]) if "LCL" in clean_data.columns and len(clean_data["LCL"].dropna()) > 0 else None
+    is_multi_spec_fanlishui = (
+        selected_unit == "凡立水課" and 
+        selected_stage_label in ["製程IPQC", "成品FQC"] and 
+        len(selected_specs) > 1
+    )
+
+    if is_multi_spec_fanlishui:
+        usl, lsl, ucl, lcl = None, None, None, None
+    else:
+        usl = float(clean_data["USL"].dropna().iloc[0]) if "USL" in clean_data.columns and len(clean_data["USL"].dropna()) > 0 else None
+        lsl = float(clean_data["LSL"].dropna().iloc[0]) if "LSL" in clean_data.columns and len(clean_data["LSL"].dropna()) > 0 else None
+        ucl = float(clean_data["UCL"].dropna().iloc[0]) if "UCL" in clean_data.columns and len(clean_data["UCL"].dropna()) > 0 else None
+        lcl = float(clean_data["LCL"].dropna().iloc[0]) if "LCL" in clean_data.columns and len(clean_data["LCL"].dropna()) > 0 else None
 
     cpu = (usl - mean_val) / (3 * std_val) if usl is not None and std_val > 0 else 0
     cpl = (mean_val - lsl) / (3 * std_val) if lsl is not None and std_val > 0 else 0
@@ -711,14 +720,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         cpk = 0.0
 
-    is_multi_spec_fanlishui = (
-        selected_unit == "凡立水課" and 
-        selected_stage_label in ["製程IPQC", "成品FQC"] and 
-        len(selected_specs) > 1
-    )
-
     def check_anomaly(val):
-        # 凡立水 IPQC/FQC 多選模式下不進行超規/超管判定
         if is_multi_spec_fanlishui:
             return "Normal"
             
@@ -776,13 +778,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     with m4:
         render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
     with m5:
-        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m5")
+        render_custom_metric("管制下限 (LCL)", "不適用" if is_fanlishui_special else (fmt_str.format(lcl) if lcl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m5")
     with m6:
-        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m6")
+        render_custom_metric("管制上限 (UCL)", "不適用" if is_fanlishui_special else (fmt_str.format(ucl) if ucl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m6")
     with m7:
-        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m7")
+        render_custom_metric("規格下限 (LSL)", "不適用" if is_fanlishui_special else (fmt_str.format(lsl) if lsl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m7")
     with m8:
-        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m8")
+        render_custom_metric("規格上限 (USL)", "不適用" if is_fanlishui_special else (fmt_str.format(usl) if usl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m8")
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
