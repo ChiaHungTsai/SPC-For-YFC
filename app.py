@@ -568,7 +568,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇 (比例：0.7, 0.25, 1.3, 0.45, 1.3, 4.2，標籤靠右) ====================
+# ==================== 5. 檢驗日期區間選擇 ====================
 today = date.today()
 current_year = today.year
 
@@ -797,13 +797,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     with m4:
         render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
     with m5:
-        render_custom_metric("管制下限 (LCL)", "不適用" if is_fanlishui_special else (fmt_str.format(lcl) if lcl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m5")
+        render_custom_metric("管制下限 (LCL)", "N/A" if is_fanlishui_special else (fmt_str.format(lcl) if lcl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m5")
     with m6:
-        render_custom_metric("管制上限 (UCL)", "不適用" if is_fanlishui_special else (fmt_str.format(ucl) if ucl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m6")
+        render_custom_metric("管制上限 (UCL)", "N/A" if is_fanlishui_special else (fmt_str.format(ucl) if ucl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m6")
     with m7:
-        render_custom_metric("規格下限 (LSL)", "不適用" if is_fanlishui_special else (fmt_str.format(lsl) if lsl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m7")
+        render_custom_metric("規格下限 (LSL)", "N/A" if is_fanlishui_special else (fmt_str.format(lsl) if lsl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m7")
     with m8:
-        render_custom_metric("規格上限 (USL)", "不適用" if is_fanlishui_special else (fmt_str.format(usl) if usl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m8")
+        render_custom_metric("規格上限 (USL)", "N/A" if is_fanlishui_special else (fmt_str.format(usl) if usl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m8")
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
