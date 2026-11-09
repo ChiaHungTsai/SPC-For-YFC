@@ -344,7 +344,7 @@ st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 網格比例設定 ====================
 master_grid_weights = [0.95, 3.0, 1.4, 3.6, 2.4, 1.4]
-button_row_weights = [0.7, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 1.4]
+button_row_weights = [0.6, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 2.0]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
