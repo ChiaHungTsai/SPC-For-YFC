@@ -256,48 +256,35 @@ for rc in required_cols:
     if rc != "階段" and rc not in df.columns:
         pass
 
-# ==================== 批號排序規則 (嚴格執行：從後往前找最後2位數字) ====================
-def make_batch_sort_key(unit, stage):
-    def batch_sort_key(s):
-        s_str = str(s).strip()
+# ==================== 原始標準批號排序函數 ====================
+def batch_sort_key(s):
+    s_str = str(s).strip()
+    i = len(s_str) - 1
+    while i >= 0 and not s_str[i].isdigit():
+        i -= 1
         
-        # 嚴格限定：只有凡立水課的 IPQC 或 FQC 中以 YPE165 開頭的樣品才套用
-        is_ype165_mode = (
-            unit == "凡立水課" and 
-            stage in ["製程IPQC", "成品FQC"] and 
-            s_str.startswith("YPE165")
-        )
+    digits_collected = []
+    while i >= 0 and len(digits_collected) < 3 and s_str[i].isdigit():
+        digits_collected.append(s_str[i])
+        i -= 1
         
-        if is_ype165_mode:
-            import re
-            rev_str = s_str[::-1]
-            rev_clean = re.sub(r'^[a-zA-Z]+', '', rev_str)
-            digits_match = re.search(r'\d+', rev_clean)
-            if digits_match:
-                digits_found = digits_match.group()[::-1]
-                if len(digits_found) >= 2:
-                    last_two = int(digits_found[-2:])
-                    return (0, last_two, s_str)
-                else:
-                    try:
-                        return (0, int(digits_found), s_str)
-                    except ValueError:
-                        pass
-        
-        # 其他所有一般批號：從後往前找最後出現的連續數字作為流水號
-        import re
-        rev_str = s_str[::-1]
-        rev_clean = re.sub(r'^[a-zA-Z]+', '', rev_str)
-        digits_match = re.search(r'\d+', rev_clean)
-        if digits_match:
-            digits_found = digits_match.group()[::-1]
-            try:
-                return (0, int(digits_found), s_str)
-            except ValueError:
-                pass
-                
-        return (1, 0, s_str)
-    return batch_sort_key
+    if len(digits_collected) > 0:
+        digits_collected.reverse()
+        num_str = "".join(digits_collected)
+        try:
+            return (0, int(num_str), s_str)
+        except ValueError:
+            pass
+            
+    import re
+    digits = re.findall(r'\d+', s_str)
+    if digits:
+        try:
+            return (0, int(digits[-1]), s_str)
+        except ValueError:
+            pass
+            
+    return (1, 0, s_str)
 
 def natural_sort_key(s):
     import re
@@ -685,9 +672,8 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
             
-            # 使用正確的排序函數計算唯一批號清單，並強制嚴格排序
-            current_batch_sort_func = make_batch_sort_key(selected_unit, selected_stage_label)
-            unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=current_batch_sort_func)
+            # 使用原始標準批號排序函數
+            unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
             
             clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
             clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
@@ -1061,7 +1047,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         ),
         xaxis=dict(
             type='date' if use_date_axis else 'category',
-            categoryorder='array' if not use_date_axis else 'array',
+            categoryorder='array' if not use_date_axis else None,
             categoryarray=unique_batches if not use_date_axis else None,
             tickformat='%Y-%m-%d' if use_date_axis else None,
             tickfont=dict(color="#000000", size=10),
