@@ -329,8 +329,8 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域網格框架配置 (下拉選單寬度固定為 4.0，按鈕欄位放大為 3.6) ====================
-master_grid_weights = [0.7, 4.0, 0.8, 4.0, 3.6, 0.6]
+# ==================== 統一全域網格框架配置 (調整後：0.7, 3.5, 1.0, 3.5, 2.8, 0.6) ====================
+master_grid_weights = [0.7, 3.5, 1.0, 3.5, 2.8, 0.6]
 button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -433,7 +433,6 @@ spec_label_text = "樣品名稱" if is_fanlishui_special else "取樣點/規格"
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 products_list = sorted(products_list, key=natural_sort_key)
 
-# 樣品名稱預設選取第一項
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
@@ -456,7 +455,6 @@ raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).
 
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
-# 取樣點/規格預設全選
 if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list) or len(st.session_state["current_spec"]) == 0:
     st.session_state["current_spec"] = raw_specs_list.copy()
 else:
@@ -506,7 +504,7 @@ with cols_row3[3]:
             label_visibility="collapsed"
         )
 
-# 全選與「全部取消」按鈕（寬度放大為 2 倍，分配於 3.6 寬度的欄位中）
+# 全選與「全部取消」按鈕
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
         b_cols = st.columns(2)
@@ -521,7 +519,7 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 (寬度固定為 4.0) ====================
+# ==================== 4. 分析項目下拉選單 (寬度固定為 3.5) ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
