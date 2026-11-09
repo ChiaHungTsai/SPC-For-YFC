@@ -344,7 +344,7 @@ st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
 # ==================== 網格比例設定 ====================
 master_grid_weights = [0.95, 3.0, 1.4, 3.6, 2.4, 1.4]
-button_row_weights = [0.7, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 2.0]
+button_row_weights = [0.6, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 2.0]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -568,7 +568,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇 ====================
+# ==================== 5. 檢驗日期區間選擇 (調整後比例：0.6, 0.25, 1.3, 0.45, 1.3, 4.2，且標籤靠右) ====================
 today = date.today()
 current_year = today.year
 
@@ -596,7 +596,7 @@ is_forced_batch_mode = (
 has_valid_dates = not is_forced_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
-    cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
+    cols_val5 = st.columns([0.6, 0.25, 1.3, 0.45, 1.3, 4.2])
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗日期</div>', unsafe_allow_html=True)
     with cols_val5[1]:
