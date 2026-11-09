@@ -788,20 +788,19 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         
         for idx, sub_spec in enumerate(selected_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
-            sub_df = sub_df.dropna(subset=["測定值"])
             if len(sub_df) == 0:
                 continue
                 
             sub_color = color_palette[idx % len(color_palette)]
             
+            plot_x, plot_y, m_colors, m_symbols, m_sizes, custom_data = [], [], [], [], [], []
+            
             if use_date_axis:
                 sub_df = sub_df.sort_values(by="_dt", ascending=True)
-                plot_x, plot_y, marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], [], [], []
-                
                 for i in range(len(sub_df)):
                     curr_dt = sub_df["_dt"].iloc[i]
                     curr_val = sub_df["測定值"].iloc[i]
-                    if pd.isna(curr_dt):
+                    if pd.isna(curr_dt) or pd.isna(curr_val):
                         continue
                     
                     if i > 0:
@@ -809,9 +808,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
                             plot_x.append(prev_dt + timedelta(days=1))
                             plot_y.append(None)
-                            marker_colors_sub.append('#00000000')
-                            marker_symbols_sub.append('circle')
-                            marker_sizes_sub.append(0)
+                            m_colors.append('#00000000')
+                            m_symbols.append('circle')
+                            m_sizes.append(0)
+                            custom_data.append("")
                     
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                     is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
@@ -825,9 +825,17 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         
                     plot_x.append(curr_dt)
                     plot_y.append(curr_val)
-                    marker_colors_sub.append(m_col)
-                    marker_symbols_sub.append(m_sym)
-                    marker_sizes_sub.append(m_sz)
+                    m_colors.append(m_col)
+                    m_symbols.append(m_sym)
+                    m_sizes.append(m_sz)
+                    
+                    formatted_val = f"{curr_val:{plotly_fmt}}"
+                    if is_spec:
+                        custom_data.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val}</span>")
+                    elif is_ctrl:
+                        custom_data.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val}</span>")
+                    else:
+                        custom_data.append(formatted_val)
             else:
                 if active_batch_col is not None:
                     plot_x = sub_df[active_batch_col].astype(str).tolist()
@@ -835,64 +843,66 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     plot_x = sub_df.index.astype(str).tolist()
                 
                 plot_y = sub_df["測定值"].tolist()
-                marker_colors_sub, marker_symbols_sub, marker_sizes_sub = [], [], []
                 for curr_val in plot_y:
+                    if pd.isna(curr_val):
+                        m_colors.append('#00000000')
+                        m_symbols.append('circle')
+                        m_sizes.append(0)
+                        custom_data.append("")
+                        continue
+                    
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                     is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                    
                     if is_spec:
-                        marker_colors_sub.append('#dc2626'); marker_symbols_sub.append('x'); marker_sizes_sub.append(10)
+                        m_col, m_sym, m_sz = '#dc2626', 'x', 10
                     elif is_ctrl:
-                        marker_colors_sub.append('#f97316'); marker_symbols_sub.append('circle'); marker_sizes_sub.append(8)
+                        m_col, m_sym, m_sz = '#f97316', 'circle', 8
                     else:
-                        marker_colors_sub.append(sub_color); marker_symbols_sub.append('circle'); marker_sizes_sub.append(6)
-            
-            # 精簡版懸浮視窗：保留原本結構，僅對超標數值加上顏色
-            hover_template_str = (
-                "%{fullSeries.name}: %{customdata}"
-                + "<extra></extra>"
-            )
-            
-            custom_data_list = []
-            for val in sub_df["測定值"]:
-                s_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
-                c_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
-                formatted_val = f"{val:{plotly_fmt}}"
-                if s_violate:
-                    custom_data_list.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val}</span>")
-                elif c_violate:
-                    custom_data_list.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val}</span>")
-                else:
-                    custom_data_list.append(formatted_val)
+                        m_col, m_sym, m_sz = sub_color, 'circle', 6
+                        
+                    m_colors.append(m_col)
+                    m_symbols.append(m_sym)
+                    m_sizes.append(m_sz)
+                    
+                    formatted_val = f"{curr_val:{plotly_fmt}}"
+                    if is_spec:
+                        custom_data.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val}</span>")
+                    elif is_ctrl:
+                        custom_data.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val}</span>")
+                    else:
+                        custom_data.append(formatted_val)
 
             fig.add_trace(go.Scatter(
                 x=plot_x, y=plot_y,
                 mode='lines+markers',
                 name=f"{sub_spec}",
-                hovertemplate=hover_template_str,
-                customdata=custom_data_list,
+                hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
+                customdata=custom_data,
                 line=dict(color=sub_color, width=2.5),
-                marker=dict(size=marker_sizes_sub, color=marker_colors_sub, symbol=marker_symbols_sub),
+                marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols),
                 connectgaps=False
             ))
     else:
+        plot_x, plot_y, m_colors, m_symbols, m_sizes, custom_data = [], [], [], [], [], []
+        
         if use_date_axis:
             clean_data = clean_data.sort_values(by="_dt", ascending=True)
-            plot_x, plot_y = [], []
-            marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
-            
             for i in range(len(clean_data)):
                 curr_dt = clean_data["_dt"].iloc[i]
                 curr_val = clean_data["測定值"].iloc[i]
-                if pd.isna(curr_dt):
+                if pd.isna(curr_dt) or pd.isna(curr_val):
                     continue
+                
                 if i > 0:
                     prev_dt = clean_data["_dt"].iloc[i - 1]
                     if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
                         plot_x.append(prev_dt + timedelta(days=1))
                         plot_y.append(None)
-                        marker_colors_list.append('#00000000')
-                        marker_symbols_list.append('circle')
-                        marker_sizes_list.append(0)
+                        m_colors.append('#00000000')
+                        m_symbols.append('circle')
+                        m_sizes.append(0)
+                        custom_data.append("")
                 
                 is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                 is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
@@ -906,9 +916,17 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     
                 plot_x.append(curr_dt)
                 plot_y.append(curr_val)
-                marker_colors_list.append(m_col)
-                marker_symbols_list.append(m_sym)
-                marker_sizes_list.append(m_sz)
+                m_colors.append(m_col)
+                m_symbols.append(m_sym)
+                m_sizes.append(m_sz)
+                
+                formatted_val = f"{curr_val:{plotly_fmt}}"
+                if is_spec:
+                    custom_data.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val}</span>")
+                elif is_ctrl:
+                    custom_data.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val}</span>")
+                else:
+                    custom_data.append(formatted_val)
         else:
             if active_batch_col is not None:
                 plot_x = clean_data[active_batch_col].astype(str).tolist()
@@ -916,42 +934,44 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 plot_x = clean_data.index.astype(str).tolist()
             
             plot_y = clean_data["測定值"].tolist()
-            marker_colors_list, marker_symbols_list, marker_sizes_list = [], [], []
             for curr_val in plot_y:
+                if pd.isna(curr_val):
+                    m_colors.append('#00000000')
+                    m_symbols.append('circle')
+                    m_sizes.append(0)
+                    custom_data.append("")
+                    continue
+                
                 is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
                 is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                
                 if is_spec:
-                    marker_colors_list.append('#dc2626'); marker_symbols_list.append('x'); marker_sizes_list.append(10)
+                    m_col, m_sym, m_sz = '#dc2626', 'x', 10
                 elif is_ctrl:
-                    marker_colors_list.append('#f97316'); marker_symbols_list.append('circle'); marker_sizes_list.append(8)
+                    m_col, m_sym, m_sz = '#f97316', 'circle', 8
                 else:
-                    marker_colors_list.append('#0284c7'); marker_symbols_list.append('circle'); marker_sizes_list.append(6)
-
-        hover_template_single = (
-            "%{fullSeries.name}: %{customdata}"
-            + "<extra></extra>"
-        )
-        
-        custom_data_single = []
-        for val in clean_data["測定值"]:
-            s_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
-            c_violate = (ucl is not None and val > ucl) or (lcl is not None and val < lcl)
-            formatted_val = f"{val:{plotly_fmt}}"
-            if s_violate:
-                custom_data_single.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val}</span>")
-            elif c_violate:
-                custom_data_single.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val}</span>")
-            else:
-                custom_data_single.append(formatted_val)
+                    m_col, m_sym, m_sz = '#0284c7', 'circle', 6
+                    
+                m_colors.append(m_col)
+                m_symbols.append(m_sym)
+                m_sizes.append(m_sz)
+                
+                formatted_val = f"{curr_val:{plotly_fmt}}"
+                if is_spec:
+                    custom_data.append(f"<span style='color: #dc2626; font-weight: bold;'>{formatted_val}</span>")
+                elif is_ctrl:
+                    custom_data.append(f"<span style='color: #f97316; font-weight: bold;'>{formatted_val}</span>")
+                else:
+                    custom_data.append(formatted_val)
 
         fig.add_trace(go.Scatter(
             x=plot_x, y=plot_y,
             mode='lines+markers',
             name=selected_param,
-            hovertemplate=hover_template_single,
-            customdata=custom_data_single,
+            hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
+            customdata=custom_data,
             line=dict(color='#0284c7', width=2),
-            marker=dict(size=marker_sizes_list, color=marker_colors_list, symbol=marker_symbols_list),
+            marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols),
             connectgaps=False
         ))
         
