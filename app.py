@@ -229,7 +229,7 @@ def load_and_preprocess_data(url):
     if prod_col and prod_col != "樣品名稱":
         temp_df = temp_df.rename(columns={prod_col: "樣品名稱"})
         
-    for col in ["單位", "阶段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL"]:
+    for col in ["單位", "階段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL"]:
         if col in temp_df.columns:
             temp_df[col] = temp_df[col].astype(str).str.strip()
             temp_df.loc[temp_df[col].isin(["nan", "NaN", "None", "NAT", "nat", ""]), col] = np.nan
@@ -329,8 +329,8 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域網格框架配置 (將全選/取消按鈕緊鄰收納在第 5 欄) ====================
-master_grid_weights = [0.7, 2.7, 0.8, 2.7, 0.9, 0.6]
+# ==================== 統一全域網格框架配置 (下拉選單寬度固定為 7.5，按鈕區放大 2 倍) ====================
+master_grid_weights = [0.7, 7.5, 0.8, 7.5, 1.8, 0.6]
 button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -506,7 +506,7 @@ with cols_row3[3]:
             label_visibility="collapsed"
         )
 
-# 全選與「全部取消」按鈕（緊鄰選單右側，文字改回全部取消）
+# 全選與「全部取消」按鈕（寬度放大 2 倍）
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
         b_cols = st.columns(2)
@@ -521,7 +521,7 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 ====================
+# ==================== 4. 分析項目下拉選單 (寬度固定為 7.5) ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
