@@ -416,6 +416,7 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
             if st.button(stage_label, key=f"s_{stage_label}", use_container_width=True, type="primary" if is_active else "secondary"):
                 if st.session_state["selected_stage"] != stage_label:
                     st.session_state["selected_stage"] = stage_label
+                    on_stage_stage_change = True
                     on_stage_change()
                     st.rerun()
         else:
@@ -455,12 +456,21 @@ raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).
 
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
+# 使用安全的 Session State 初始化，避免重複實例化錯誤
 if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
     st.session_state["current_spec"] = raw_specs_list.copy()
 else:
     st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
     if not st.session_state["current_spec"] and raw_specs_list:
         st.session_state["current_spec"] = raw_specs_list.copy()
+
+# 處理點擊全選/全消按鈕的狀態變更邏輯（在渲染 multiselect 之前處理）
+if st.session_state.get("trigger_action") == "select_all":
+    st.session_state["current_spec"] = raw_specs_list.copy()
+    st.session_state.pop("trigger_action", None)
+elif st.session_state.get("trigger_action") == "deselect_all":
+    st.session_state["current_spec"] = []
+    st.session_state.pop("trigger_action", None)
 
 is_all_selected = len(raw_specs_list) > 0 and set(st.session_state["current_spec"]) == set(raw_specs_list)
 is_none_selected = len(st.session_state["current_spec"]) == 0
@@ -496,17 +506,17 @@ with cols_row3[3]:
             label_visibility="collapsed"
         )
 
-# 批次選取全選/全部取消按鈕邏輯（透過修改 callback 或點擊觸發狀態更新）
+# 批次選取全選/全消按鈕（使用 trigger_action 狀態安全觸發）
 with cols_row3[5]:
     if len(raw_specs_list) > 0:
         b_cols = st.columns(2)
         with b_cols[0]:
             if st.button("全選", key="btn_select_all", use_container_width=True, disabled=is_all_selected):
-                st.session_state["current_spec"] = raw_specs_list.copy()
+                st.session_state["trigger_action"] = "select_all"
                 st.rerun()
         with b_cols[1]:
             if st.button("全消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
-                st.session_state["current_spec"] = []
+                st.session_state["trigger_action"] = "deselect_all"
                 st.rerun()
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
