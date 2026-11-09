@@ -765,7 +765,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     with m6:
         render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m6")
     with m7:
-        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m7")
+        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2",="#ef4444", "#b91c1c", "m7") # type: ignore
     with m8:
         render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m8")
     
@@ -781,10 +781,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     fig = go.Figure()
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
-        # 將顏色配置重新調整，確保 V710A（藍色系）與調整槽（深紫色系）彼此獨立不撞色，且全部避開紅色與橘色
+        # 採用極高對比度的飽和工業色系（深黑藍、亮青、翠綠、亮紫、深藍），徹底拉開顏色差距
         color_palette = [
-            '#0f172a', '#0284c7', '#0d9488', '#7c3aed', '#4f46e5',
-            '#2563eb', '#10b981', '#65a30d', '#9333ea', '#ca8a04'
+            '#0f172a', '#0099ff', '#059669', '#9333ea', '#4f46e5',
+            '#0284c7', '#10b981', '#7c3aed', '#ca8a04', '#d97706'
         ]
         
         for idx, sub_spec in enumerate(selected_specs):
@@ -913,7 +913,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 elif is_ctrl:
                     m_col, m_sym, m_sz = '#f97316', 'circle', 8
                 else:
-                    m_col, m_sym, m_sz = '#0284c7', 'circle', 6
+                    m_col, m_sym, m_sz = '#0099ff', 'circle', 6
                     
                 plot_x.append(curr_dt)
                 plot_y.append(curr_val)
@@ -951,7 +951,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 elif is_ctrl:
                     m_col, m_sym, m_sz = '#f97316', 'circle', 8
                 else:
-                    m_col, m_sym, m_sz = '#0284c7', 'circle', 6
+                    m_col, m_sym, m_sz = '#0099ff', 'circle', 6
                     
                 m_colors.append(m_col)
                 m_symbols.append(m_sym)
@@ -971,7 +971,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             name=selected_param,
             hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
             customdata=custom_data,
-            line=dict(color='#0284c7', width=2),
+            line=dict(color='#0099ff', width=2),
             marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols),
             connectgaps=False
         ))
