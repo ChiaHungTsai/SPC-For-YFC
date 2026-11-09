@@ -783,6 +783,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     fig = go.Figure()
     
+    # 判斷是否為凡立水課的 IPQC 或 FQC 且選擇了多個樣品名稱（取樣點/規格）
+    is_multi_spec_fanlishui = (
+        selected_unit == "凡立水課" and 
+        selected_stage_label in ["製程IPQC", "成品FQC"] and 
+        len(selected_specs) > 1
+    )
+    
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#111827', '#0066ff', '#059669', '#d97706', '#9333ea',
@@ -816,8 +823,12 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                             m_sizes.append(0)
                             custom_data.append("")
                     
-                    is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
-                    is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                    # 如果是多樣品模式，不進行超規/超管紅點判定，全部顯示為一般樣式
+                    if is_multi_spec_fanlishui:
+                        is_spec, is_ctrl = False, False
+                    else:
+                        is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                        is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
                     
                     if is_spec:
                         m_col, m_sym, m_sz = '#dc2626', 'x', 10
@@ -855,8 +866,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         custom_data.append("")
                         continue
                     
-                    is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
-                    is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                    if is_multi_spec_fanlishui:
+                        is_spec, is_ctrl = False, False
+                    else:
+                        is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                        is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
                     
                     if is_spec:
                         m_col, m_sym, m_sz = '#dc2626', 'x', 10
@@ -909,8 +923,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         m_sizes.append(0)
                         custom_data.append("")
                 
-                is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
-                is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                if is_multi_spec_fanlishui:
+                    is_spec, is_ctrl = False, False
+                else:
+                    is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                    is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
                 
                 if is_spec:
                     m_col, m_sym, m_sz = '#dc2626', 'x', 10
@@ -948,8 +965,11 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     custom_data.append("")
                     continue
                 
-                is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
-                is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
+                if is_multi_spec_fanlishui:
+                    is_spec, is_ctrl = False, False
+                else:
+                    is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
+                    is_ctrl = (ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl)
                 
                 if is_spec:
                     m_col, m_sym, m_sz = '#dc2626', 'x', 10
@@ -982,44 +1002,48 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             connectgaps=False
         ))
         
-        fig.add_hline(
-            y=mean_val, line_dash="solid", line_color="#10b981", 
-            annotation_text=f"CL: {fmt_str.format(mean_val)}", 
-            annotation_font_color="#10b981",
-            annotation_position="bottom right"
-        )
+        # 只有在非多樣品凡立水模式下才顯示平均值參考線 (CL)
+        if not is_multi_spec_fanlishui:
+            fig.add_hline(
+                y=mean_val, line_dash="solid", line_color="#10b981", 
+                annotation_text=f"CL: {fmt_str.format(mean_val)}", 
+                annotation_font_color="#10b981",
+                annotation_position="bottom right"
+            )
     
-    if ucl is not None:
-        fig.add_hline(
-            y=ucl, line_dash="dot", line_color="#f97316", 
-            annotation_text=f"UCL: {fmt_str.format(ucl)}", 
-            annotation_font_color="#f97316",
-            annotation_position="top left"
-        )
-    
-    if lcl is not None:
-        fig.add_hline(
-            y=lcl, line_dash="dot", line_color="#f97316", 
-            annotation_text=f"LCL: {fmt_str.format(lcl)}", 
-            annotation_font_color="#f97316",
-            annotation_position="bottom left"
-        )
+    # 只有在非多樣品凡立水模式下才繪製 UCL、LCL、USL、LSL 界限
+    if not is_multi_spec_fanlishui:
+        if ucl is not None:
+            fig.add_hline(
+                y=ucl, line_dash="dot", line_color="#f97316", 
+                annotation_text=f"UCL: {fmt_str.format(ucl)}", 
+                annotation_font_color="#f97316",
+                annotation_position="top left"
+            )
         
-    if usl is not None:
-        fig.add_hline(
-            y=usl, line_dash="dash", line_color="#ef4444", 
-            annotation_text=f"USL: {fmt_str.format(usl)}", 
-            annotation_font_color="#ef4444",
-            annotation_position="top right"
-        )
-        
-    if lsl is not None:
-        fig.add_hline(
-            y=lsl, line_dash="dash", line_color="#ef4444", 
-            annotation_text=f"LSL: {fmt_str.format(lsl)}", 
-            annotation_font_color="#ef4444",
-            annotation_position="bottom right"
-        )
+        if lcl is not None:
+            fig.add_hline(
+                y=lcl, line_dash="dot", line_color="#f97316", 
+                annotation_text=f"LCL: {fmt_str.format(lcl)}", 
+                annotation_font_color="#f97316",
+                annotation_position="bottom left"
+            )
+            
+        if usl is not None:
+            fig.add_hline(
+                y=usl, line_dash="dash", line_color="#ef4444", 
+                annotation_text=f"USL: {fmt_str.format(usl)}", 
+                annotation_font_color="#ef4444",
+                annotation_position="top right"
+            )
+            
+        if lsl is not None:
+            fig.add_hline(
+                y=lsl, line_dash="dash", line_color="#ef4444", 
+                annotation_text=f"LSL: {fmt_str.format(lsl)}", 
+                annotation_font_color="#ef4444",
+                annotation_position="bottom right"
+            )
 
     fig.update_layout(
         title=dict(text="", font=dict(color="#000000", size=1)),
