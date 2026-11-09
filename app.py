@@ -433,9 +433,9 @@ spec_label_text = "樣品名稱" if is_fanlishui_special else "取樣點/規格"
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 products_list = sorted(products_list, key=natural_sort_key)
 
-# 預設樣品名稱在第一個選項
+# 樣品名稱 / 樣品種類預設為沒有選取 (index=None)
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
-    st.session_state["current_product"] = products_list[0] if products_list else ""
+    st.session_state["current_product"] = None
 
 cols_row3 = st.columns(master_grid_weights)
 
@@ -444,25 +444,25 @@ with cols_row3[0]:
 with cols_row3[1]:
     selected_product = st.selectbox(
         product_label_text, 
-        options=products_list if products_list else ["請先選擇製程階段"], 
+        options=products_list,
+        index=None,
+        placeholder="請選擇...",
         key="current_product",
         on_change=on_product_change,
         label_visibility="collapsed"
     )
 
-prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_list and selected_product != "請先選擇製程階段" else pd.DataFrame()
+prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if selected_product and selected_product in products_list else pd.DataFrame()
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
-# 預設取樣點/規格在第一個選項
+# 取樣點/規格 (或凡立水樣品名稱) 預設為沒有選取 (空串列 [])
 if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
-    st.session_state["current_spec"] = [raw_specs_list[0]] if raw_specs_list else []
+    st.session_state["current_spec"] = []
 else:
     st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
-    if not st.session_state["current_spec"] and raw_specs_list:
-        st.session_state["current_spec"] = [raw_specs_list[0]]
 
 if st.session_state.get("trigger_action") == "select_all":
     st.session_state["current_spec"] = raw_specs_list.copy()
@@ -483,6 +483,7 @@ with cols_row3[3]:
             spec_label_text,
             options=raw_specs_list,
             key="current_spec",
+            placeholder="請選擇（可多選）...",
             on_change=on_spec_change,
             label_visibility="collapsed"
         )
@@ -498,8 +499,8 @@ with cols_row3[3]:
         spec_df = prod_df
         st.multiselect(
             spec_label_text,
-            options=["無資料"],
-            default=["無資料"],
+            options=["請先選擇上方項目"],
+            default=[],
             disabled=True,
             key="sel_spec_disabled",
             label_visibility="collapsed"
@@ -526,28 +527,27 @@ with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
 
 with cols_param[1]:
-    if len(raw_specs_list) == 0 or len(selected_specs) > 0:
+    if selected_product and len(selected_specs) > 0:
         params_list = spec_df["分析項目"].dropna().unique().tolist() if len(spec_df) > 0 and "分析項目" in spec_df.columns else []
         params_list = sorted(params_list, key=natural_sort_key)
 
         if "current_param" not in st.session_state or st.session_state["current_param"] not in params_list:
-            default_p = next((p for p in params_list if "濃度" in p), None)
-            if default_p:
-                st.session_state["current_param"] = default_p
-            else:
-                st.session_state["current_param"] = params_list[0] if params_list else ""
+            st.session_state["current_param"] = None
 
         selected_param = st.selectbox(
             "分析項目", 
-            params_list if params_list else ["請先選擇樣品名稱"], 
+            options=params_list,
+            index=None,
+            placeholder="請選擇...",
             key="current_param", 
             label_visibility="collapsed"
         )
-        final_df = spec_df[(spec_df["分析項目"] == selected_param)] if len(spec_df) > 0 and params_list else pd.DataFrame()
+        final_df = spec_df[(spec_df["分析項目"] == selected_param)] if selected_param and len(spec_df) > 0 and params_list else pd.DataFrame()
     else:
         st.selectbox(
             "分析項目", 
-            ["請先選擇取樣點/規格"], 
+            options=["請先選擇上方項目"],
+            index=None,
             disabled=True, 
             key="param_disabled", 
             label_visibility="collapsed"
@@ -583,7 +583,7 @@ is_forced_batch_mode = (
     (selected_unit == "矽碳課-矽膠" and selected_stage_label == "出貨OQC")
 )
 
-has_valid_dates = not is_forced_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
+has_valid_dates = not is_forced_batch_mode and selected_param and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
     cols_val5 = st.columns([0.7, 0.35, 1.3, 0.45, 1.3, 4.2])
@@ -625,8 +625,12 @@ if has_valid_dates and len(filtered_df) > 0:
 st.markdown("<hr style='margin: 12px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
 
 # ==================== 數據小數點位數讀取與圖表渲染 ====================
-if len(raw_specs_list) > 0 and len(selected_specs) == 0:
-    st.warning("尚未選擇項目")
+if not selected_product:
+    st.info("👆 請先在上方的「樣品名稱 / 樣品種類」選單中選擇項目。")
+elif len(raw_specs_list) > 0 and len(selected_specs) == 0:
+    st.info("👆 請先在「取樣點/規格」選單中勾選至少一個項目。")
+elif not selected_param:
+    st.info("👆 請先在上方的「分析項目」選單中選擇項目。")
 elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     clean_data = filtered_df.dropna(subset=["測定值"]).copy()
     
@@ -697,7 +701,7 @@ else:
     active_batch_col = None
     unique_batches = []
 
-if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
+if selected_product and len(selected_specs) > 0 and selected_param and len(clean_data) > 0:
     values = clean_data["測定值"]
     mean_val = values.mean()
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
