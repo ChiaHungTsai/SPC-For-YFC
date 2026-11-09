@@ -423,6 +423,12 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
+# 判斷是否為凡立水的製程IPQC或成品FQC
+is_fanlishui_special = (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"])
+
+product_label_text = "樣品種類" if is_fanlishui_special else "樣品名稱"
+spec_label_text = "樣品名稱" if is_fanlishui_special else "取樣點/規格"
+
 # ==================== 3. 樣品名稱與取樣點/規格選單 ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 products_list = sorted(products_list, key=natural_sort_key)
@@ -433,10 +439,10 @@ if "current_product" not in st.session_state or st.session_state["current_produc
 cols_row3 = st.columns(master_grid_weights)
 
 with cols_row3[0]:
-    st.markdown('<div class="row-label">樣品名稱</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="row-label">{product_label_text}</div>', unsafe_allow_html=True)
 with cols_row3[1]:
     selected_product = st.selectbox(
-        "樣品名稱", 
+        product_label_text, 
         products_list if products_list else ["請先選擇製程階段"], 
         key="current_product",
         on_change=on_product_change,
@@ -476,12 +482,12 @@ with cols_row3[5]:
             st.rerun()
 
 with cols_row3[2]:
-    st.markdown('<div class="row-label">取樣點/規格</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="row-label">{spec_label_text}</div>', unsafe_allow_html=True)
 
 with cols_row3[3]:
     if len(raw_specs_list) > 0:
         selected_specs = st.multiselect(
-            "取樣點/規格",
+            spec_label_text,
             options=raw_specs_list,
             key="current_spec",
             on_change=on_spec_change,
@@ -498,9 +504,9 @@ with cols_row3[3]:
         selected_specs = []
         spec_df = prod_df
         st.multiselect(
-            "取樣點/規格",
-            options=["無取樣點/規格資料"],
-            default=["無取樣點/規格資料"],
+            spec_label_text,
+            options=["無資料"],
+            default=["無資料"],
             disabled=True,
             key="sel_spec_disabled",
             label_visibility="collapsed"
@@ -614,7 +620,7 @@ st.markdown("<hr style='margin: 12px 0; border-color: #cbd5e1;'>", unsafe_allow_
 
 # ==================== 數據小數點位數讀取與圖表渲染 ====================
 if len(raw_specs_list) > 0 and len(selected_specs) == 0:
-    st.warning("尚未選擇取樣點/規格")
+    st.warning("尚未選擇項目")
 elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     clean_data = filtered_df.dropna(subset=["測定值"]).copy()
     
@@ -1086,7 +1092,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         spec_pct = (spec_count / total_count * 100) if total_count > 0 else 0.0
         control_pct = (control_count / total_count * 100) if total_count > 0 else 0.0
         
-        # 將括號內的字樣改為黑色字體顯示
         st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 <span style="color: #000000;">(總樣本數：{total_count:,} 筆 ｜ 超出規格範圍：{spec_count} 筆 [{spec_pct:.2f}%] ｜ 超出管制範圍：{control_count} 筆 [{control_pct:.2f}%])</span></div>', unsafe_allow_html=True)
         
         col_name_mapping = {
