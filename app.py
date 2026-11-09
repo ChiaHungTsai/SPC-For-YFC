@@ -342,9 +342,9 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域網格框架配置 (調整為：0.95, 3.0, 1.4, 3.6, 2.4, 1.4) ====================
+# ==================== 網格比例設定 ====================
 master_grid_weights = [0.95, 3.0, 1.4, 3.6, 2.4, 1.4]
-button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
+button_row_weights = [0.7, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
 fixed_units_list = [
@@ -485,7 +485,6 @@ elif st.session_state.get("trigger_action") == "deselect_all":
 is_all_selected = len(raw_specs_list) > 0 and set(st.session_state["current_spec"]) == set(raw_specs_list)
 is_none_selected = len(st.session_state["current_spec"]) == 0
 
-# 將「取樣點/規格」標籤靠右對齊
 with cols_row3[2]:
     st.markdown(f'<div class="row-label-right">{spec_label_text}</div>', unsafe_allow_html=True)
 
@@ -518,7 +517,6 @@ with cols_row3[3]:
             label_visibility="collapsed"
         )
 
-# 全選與「全部取消」按鈕
 with cols_row3[4]:
     if len(raw_specs_list) > 0:
         b_cols = st.columns(2)
@@ -589,7 +587,6 @@ if "end_date" not in st.session_state:
 if st.session_state["start_date"] > st.session_state["end_date"]:
     st.session_state["start_date"] = st.session_state["end_date"]
 
-# 判斷是否為強制批號模式
 is_forced_batch_mode = (
     (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"]) or
     (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC") or
