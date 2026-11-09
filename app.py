@@ -433,9 +433,9 @@ spec_label_text = "樣品名稱" if is_fanlishui_special else "取樣點/規格"
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 products_list = sorted(products_list, key=natural_sort_key)
 
-# 樣品名稱 / 樣品種類預設為沒有選取 (index=None)
+# 樣品名稱 / 樣品種類預設選取第一項
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
-    st.session_state["current_product"] = None
+    st.session_state["current_product"] = products_list[0] if products_list else ""
 
 cols_row3 = st.columns(master_grid_weights)
 
@@ -444,21 +444,19 @@ with cols_row3[0]:
 with cols_row3[1]:
     selected_product = st.selectbox(
         product_label_text, 
-        options=products_list,
-        index=None,
-        placeholder="請選擇...",
+        options=products_list if products_list else ["請先選擇製程階段"], 
         key="current_product",
         on_change=on_product_change,
         label_visibility="collapsed"
     )
 
-prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if selected_product and selected_product in products_list else pd.DataFrame()
+prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_list and selected_product != "請先選擇製程階段" else pd.DataFrame()
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]]
 
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
-# 取樣點/規格 (或凡立水樣品名稱) 預設為沒有選取 (空串列 [])
+# 取樣點/規格預設為未選取狀態 (空串列 [])
 if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
     st.session_state["current_spec"] = []
 else:
