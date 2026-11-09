@@ -105,7 +105,6 @@ st.markdown("""
         white-space: nowrap;
     }
     
-    /* 專門用來讓標題靠右對齊的樣式 */
     .row-label-right {
         font-size: 16px;
         font-weight: 700;
@@ -141,7 +140,6 @@ st.markdown("""
         white-space: nowrap !important;
     }
     
-    /* 將第一二排按鈕寬度設定為 70pt */
     div[data-testid="column"] .stButton > button {
         width: 70pt !important;
         min-width: 70pt !important;
@@ -713,13 +711,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
     n = len(values)
 
-    is_multi_spec_fanlishui = (
-        selected_unit == "凡立水課" and 
-        selected_stage_label in ["製程IPQC", "成品FQC"] and 
-        len(selected_specs) > 1
-    )
+    # 判斷是否為「凡立水課 (IPQC/FQC)」或「雙氧水課 (成品FQC)」且勾選多個取樣點/規格
+    is_multi_spec_special = (
+        (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"]) or
+        (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC")
+    ) and len(selected_specs) > 1
 
-    if is_multi_spec_fanlishui:
+    if is_multi_spec_special:
         usl, lsl, ucl, lcl = None, None, None, None
     else:
         usl = float(clean_data["USL"].dropna().iloc[0]) if "USL" in clean_data.columns and len(clean_data["USL"].dropna()) > 0 else None
@@ -740,7 +738,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         cpk = 0.0
 
     def check_anomaly(val):
-        if is_multi_spec_fanlishui:
+        if is_multi_spec_special:
             return "Normal"
             
         spec_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
@@ -797,13 +795,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     with m4:
         render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
     with m5:
-        render_custom_metric("管制下限 (LCL)", "N/A" if is_fanlishui_special else (fmt_str.format(lcl) if lcl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m5")
+        render_custom_metric("管制下限 (LCL)", "N/A" if is_multi_spec_special else (fmt_str.format(lcl) if lcl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m5")
     with m6:
-        render_custom_metric("管制上限 (UCL)", "N/A" if is_fanlishui_special else (fmt_str.format(ucl) if ucl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m6")
+        render_custom_metric("管制上限 (UCL)", "N/A" if is_multi_spec_special else (fmt_str.format(ucl) if ucl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m6")
     with m7:
-        render_custom_metric("規格下限 (LSL)", "N/A" if is_fanlishui_special else (fmt_str.format(lsl) if lsl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m7")
+        render_custom_metric("規格下限 (LSL)", "N/A" if is_multi_spec_special else (fmt_str.format(lsl) if lsl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m7")
     with m8:
-        render_custom_metric("規格上限 (USL)", "N/A" if is_fanlishui_special else (fmt_str.format(usl) if usl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m8")
+        render_custom_metric("規格上限 (USL)", "N/A" if is_multi_spec_special else (fmt_str.format(usl) if usl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m8")
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
@@ -849,7 +847,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                             m_sizes.append(0)
                             custom_data.append("")
                     
-                    if is_multi_spec_fanlishui:
+                    if is_multi_spec_special:
                         is_spec, is_ctrl = False, False
                     else:
                         is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
@@ -891,7 +889,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         custom_data.append("")
                         continue
                     
-                    if is_multi_spec_fanlishui:
+                    if is_multi_spec_special:
                         is_spec, is_ctrl = False, False
                     else:
                         is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
@@ -948,7 +946,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         m_sizes.append(0)
                         custom_data.append("")
                 
-                if is_multi_spec_fanlishui:
+                if is_multi_spec_special:
                     is_spec, is_ctrl = False, False
                 else:
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
@@ -990,7 +988,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     custom_data.append("")
                     continue
                 
-                if is_multi_spec_fanlishui:
+                if is_multi_spec_special:
                     is_spec, is_ctrl = False, False
                 else:
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
@@ -1027,7 +1025,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             connectgaps=False
         ))
         
-        if not is_multi_spec_fanlishui:
+        if not is_multi_spec_special:
             fig.add_hline(
                 y=mean_val, line_dash="solid", line_color="#10b981", 
                 annotation_text=f"CL: {fmt_str.format(mean_val)}", 
@@ -1035,7 +1033,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 annotation_position="bottom right"
             )
     
-    if not is_multi_spec_fanlishui:
+    if not is_multi_spec_special:
         if ucl is not None:
             fig.add_hline(
                 y=ucl, line_dash="dot", line_color="#f97316", 
