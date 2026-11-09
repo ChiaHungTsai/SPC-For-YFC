@@ -1086,7 +1086,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         spec_pct = (spec_count / total_count * 100) if total_count > 0 else 0.0
         control_pct = (control_count / total_count * 100) if total_count > 0 else 0.0
         
-        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 (總樣本數：{total_count:,} 筆 ｜ 超出規格範圍：{spec_count} 筆 [{spec_pct:.2f}%] ｜ 超出管制範圍：{control_count} 筆 [{control_pct:.2f}%])</div>', unsafe_allow_html=True)
+        # 將括號內的字樣改為黑色字體顯示
+        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 <span style="color: #000000;">(總樣本數：{total_count:,} 筆 ｜ 超出規格範圍：{spec_count} 筆 [{spec_pct:.2f}%] ｜ 超出管制範圍：{control_count} 筆 [{control_pct:.2f}%])</span></div>', unsafe_allow_html=True)
         
         col_name_mapping = {
             "異常狀況": "異常狀況",
