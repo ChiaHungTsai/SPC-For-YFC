@@ -781,9 +781,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     fig = go.Figure()
     
     if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
-        # 嚴格避開紅色、橘色，採用高對比且互不干擾的顏色清單（確保不會與調整槽的顏色或管制界線撞色）
+        # 將顏色配置重新調整，確保 V710A（藍色系）與調整槽（深紫色系）彼此獨立不撞色，且全部避開紅色與橘色
         color_palette = [
-            '#0f172a', '#0284c7', '#0d9488', '#4f46e5', '#7c3aed',
+            '#0f172a', '#0284c7', '#0d9488', '#7c3aed', '#4f46e5',
             '#2563eb', '#10b981', '#65a30d', '#9333ea', '#ca8a04'
         ]
         
