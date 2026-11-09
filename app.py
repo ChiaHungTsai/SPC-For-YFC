@@ -229,7 +229,7 @@ def load_and_preprocess_data(url):
     if prod_col and prod_col != "樣品名稱":
         temp_df = temp_df.rename(columns={prod_col: "樣品名稱"})
         
-    for col in ["單位", "階段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL"]:
+    for col in ["單位", "阶段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL"]:
         if col in temp_df.columns:
             temp_df[col] = temp_df[col].astype(str).str.strip()
             temp_df.loc[temp_df[col].isin(["nan", "NaN", "None", "NAT", "nat", ""]), col] = np.nan
@@ -329,8 +329,8 @@ with header_cols[1]:
 
 st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
 
-# ==================== 統一全域網格框架配置 (將 3 個下拉選單寬度統一設為 2.7) ====================
-master_grid_weights = [0.7, 2.7, 0.8, 2.7, 0.5, 0.9, 0.6]
+# ==================== 統一全域網格框架配置 (將全選/取消按鈕緊鄰收納在第 5 欄) ====================
+master_grid_weights = [0.7, 2.7, 0.8, 2.7, 0.9, 0.6]
 button_row_weights = [0.7, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.7]
 
 # ==================== 1. 製造單位按鈕群組 ====================
@@ -433,7 +433,7 @@ spec_label_text = "樣品名稱" if is_fanlishui_special else "取樣點/規格"
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 products_list = sorted(products_list, key=natural_sort_key)
 
-# 樣品名稱 / 樣品種類預設選取第一項
+# 樣品名稱預設選取第一項
 if "current_product" not in st.session_state or st.session_state["current_product"] not in products_list:
     st.session_state["current_product"] = products_list[0] if products_list else ""
 
@@ -456,7 +456,7 @@ raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).
 
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
-# 取樣點/規格 (或凡立水樣品名稱) 預設全選，讓畫面可以直接呈現數據
+# 取樣點/規格預設全選
 if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list) or len(st.session_state["current_spec"]) == 0:
     st.session_state["current_spec"] = raw_specs_list.copy()
 else:
@@ -506,8 +506,8 @@ with cols_row3[3]:
             label_visibility="collapsed"
         )
 
-# 批次選取全選/全部取消按鈕
-with cols_row3[5]:
+# 全選與「全部取消」按鈕（緊鄰選單右側，文字改回全部取消）
+with cols_row3[4]:
     if len(raw_specs_list) > 0:
         b_cols = st.columns(2)
         with b_cols[0]:
@@ -515,13 +515,13 @@ with cols_row3[5]:
                 st.session_state["trigger_action"] = "select_all"
                 st.rerun()
         with b_cols[1]:
-            if st.button("全消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
+            if st.button("全部取消", key="btn_deselect_all", use_container_width=True, disabled=is_none_selected):
                 st.session_state["trigger_action"] = "deselect_all"
                 st.rerun()
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 (寬度與上方對齊 2.7) ====================
+# ==================== 4. 分析項目下拉選單 ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
