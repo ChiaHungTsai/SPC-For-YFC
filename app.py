@@ -496,7 +496,7 @@ with cols_row3[3]:
             label_visibility="collapsed"
         )
 
-# 批次選取全選/全部取消按鈕
+# 批次選取全選/全部取消按鈕邏輯（透過修改 callback 或點擊觸發狀態更新）
 with cols_row3[5]:
     if len(raw_specs_list) > 0:
         b_cols = st.columns(2)
