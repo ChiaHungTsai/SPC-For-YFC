@@ -440,7 +440,7 @@ is_fanlishui_special = (selected_unit == "凡立水課" and selected_stage_label
 product_label_text = "樣品種類" if is_fanlishui_special else "樣品名稱"
 spec_label_text = "樣品名稱" if is_fanlishui_special else "取樣點/規格"
 
-# ==================== 3. 樣品名稱與取樣點/規格選單 (預設選取第一項) ====================
+# ==================== 3. 樣品名稱與取樣點/規格選單 ====================
 products_list = stage_df["樣品名稱"].dropna().unique().tolist() if len(stage_df) > 0 and "樣品名稱" in stage_df.columns else []
 products_list = sorted(products_list, key=natural_sort_key)
 
@@ -466,13 +466,11 @@ raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).
 
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
-# 取樣點/規格（批號）預設選取第一項（改為預設選取第一項，若有多選需求使用者可自行再勾選）
-if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list) or len(st.session_state["current_spec"]) == 0:
-    st.session_state["current_spec"] = [raw_specs_list[0]] if raw_specs_list else []
+# 取樣點/規格（批號）預設改為空清單，允許使用者自由按 x 取消或點選
+if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
+    st.session_state["current_spec"] = []
 else:
     st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
-    if not st.session_state["current_spec"] and raw_specs_list:
-        st.session_state["current_spec"] = [raw_specs_list[0]]
 
 if st.session_state.get("trigger_action") == "select_all":
     st.session_state["current_spec"] = raw_specs_list.copy()
@@ -530,7 +528,7 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單（優先選擇純度、固含量、Na2O、NaCl、KCl、S.S.） ====================
+# ==================== 4. 分析項目下拉選單 ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
