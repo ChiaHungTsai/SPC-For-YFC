@@ -529,7 +529,7 @@ with cols_row3[4]:
 
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# ==================== 4. 分析項目下拉選單 ====================
+# ==================== 4. 分析項目下拉選單（自動優先選擇純度、固含量、Na2O、NaCl、KCl、S.S.） ====================
 cols_param = st.columns(master_grid_weights)
 with cols_param[0]:
     st.markdown('<div class="row-label">分析項目</div>', unsafe_allow_html=True)
@@ -540,7 +540,14 @@ with cols_param[1]:
         params_list = sorted(params_list, key=natural_sort_key)
 
         if "current_param" not in st.session_state or st.session_state["current_param"] not in params_list:
-            default_p = next((p for p in params_list if "濃度" in p), None)
+            priority_keywords = ["純度", "固含量", "na2o", "nacl", "kcl", "s.s."]
+            default_p = None
+            for kw in priority_keywords:
+                match_p = next((p for p in params_list if kw in p.lower()), None)
+                if match_p:
+                    default_p = match_p
+                    break
+            
             if default_p:
                 st.session_state["current_param"] = default_p
             else:
@@ -711,7 +718,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
     n = len(values)
 
-    # 判斷是否為「凡立水課 (IPQC/FQC)」或「雙氧水課 (成品FQC)」且勾選多個取樣點/規格
     is_multi_spec_special = (
         (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"]) or
         (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC")
