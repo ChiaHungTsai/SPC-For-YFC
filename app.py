@@ -571,7 +571,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇與長期鎖定維持 ====================
+# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕（結合動態 Key 確保強制刷新） ====================
 today = date.today()
 current_year = today.year
 
@@ -582,7 +582,9 @@ else:
 
 default_end = today
 
-# 使用專屬 session_state 鍵值來獨立儲存使用者的自訂日期，切換其他選單時絕對不會遺失
+if "date_reset_version" not in st.session_state:
+    st.session_state["date_reset_version"] = 0
+
 if "user_start_date" not in st.session_state:
     st.session_state["user_start_date"] = default_start
 if "user_end_date" not in st.session_state:
@@ -609,7 +611,7 @@ if has_valid_dates:
         start_date = st.date_input(
             "起始日期", 
             value=st.session_state["user_start_date"], 
-            key="start_date_input_widget", 
+            key=f"start_date_widget_{st.session_state['date_reset_version']}", 
             label_visibility="collapsed"
         )
         st.session_state["user_start_date"] = start_date
@@ -622,7 +624,7 @@ if has_valid_dates:
             value=st.session_state["user_end_date"], 
             min_value=st.session_state["user_start_date"], 
             max_value=today, 
-            key="end_date_input_widget", 
+            key=f"end_date_widget_{st.session_state['date_reset_version']}", 
             label_visibility="collapsed"
         )
         st.session_state["user_end_date"] = end_date
@@ -631,6 +633,7 @@ if has_valid_dates:
         if st.button("恢復預設", key="btn_reset_dates", use_container_width=True):
             st.session_state["user_start_date"] = default_start
             st.session_state["user_end_date"] = default_end
+            st.session_state["date_reset_version"] += 1  # 變更版本號，強勢重置畫面元件
             st.rerun()
 
 filtered_df = final_df.copy()
