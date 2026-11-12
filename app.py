@@ -466,7 +466,6 @@ raw_specs_list = [str(s).strip() for s in valid_specs_series.unique() if str(s).
 
 raw_specs_list = sorted(raw_specs_list, key=natural_sort_key)
 
-# 取樣點/規格（批號）預設改為空清單，允許使用者自由按 x 取消或點選
 if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
     st.session_state["current_spec"] = []
 else:
@@ -572,7 +571,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇 ====================
+# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕 ====================
 today = date.today()
 current_year = today.year
 
@@ -600,7 +599,7 @@ is_forced_batch_mode = (
 has_valid_dates = not is_forced_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
 
 if has_valid_dates:
-    cols_val5 = st.columns([0.7, 0.25, 1.3, 0.45, 1.3, 4.2])
+    cols_val5 = st.columns([0.6, 0.25, 1.3, 0.45, 1.3, 0.9, 2.1])
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗日期</div>', unsafe_allow_html=True)
     with cols_val5[1]:
@@ -627,6 +626,12 @@ if has_valid_dates:
             label_visibility="collapsed"
         )
         st.session_state["end_date"] = end_date
+
+    with cols_val5[5]:
+        if st.button("恢復預設", key="btn_reset_dates", use_container_width=True):
+            st.session_state["start_date"] = default_start
+            st.session_state["end_date"] = default_end
+            st.rerun()
 
 filtered_df = final_df.copy()
 if has_valid_dates and len(filtered_df) > 0:
