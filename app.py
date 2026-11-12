@@ -571,7 +571,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕 (比例調整為：0.7, 0.25, 1.3, 0.45, 1.3, 0.9, 3.2) ====================
+# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕 (比例：0.7, 0.25, 1.3, 0.45, 1.3, 0.9, 3.2) ====================
 today = date.today()
 current_year = today.year
 
@@ -629,6 +629,9 @@ if has_valid_dates:
 
     with cols_val5[5]:
         if st.button("恢復預設", key="btn_reset_dates", use_container_width=True):
+            # 直接更新 session_state 中的日期輸入框對應 key，強制畫面同步重設
+            st.session_state["start_date_input"] = default_start
+            st.session_state["end_date_input"] = default_end
             st.session_state["start_date"] = default_start
             st.session_state["end_date"] = default_end
             st.rerun()
