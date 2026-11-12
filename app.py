@@ -571,7 +571,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕 (比例：0.7, 0.25, 1.3, 0.45, 1.3, 0.9, 3.2) ====================
+# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕 ====================
 today = date.today()
 current_year = today.year
 
@@ -582,13 +582,14 @@ else:
 
 default_end = today
 
-if "start_date" not in st.session_state:
-    st.session_state["start_date"] = default_start
-if "end_date" not in st.session_state:
-    st.session_state["end_date"] = default_end
+# 透過 session_state 初始化日期狀態，避免直接對 widget key 賦值衝突
+if "start_date_val" not in st.session_state:
+    st.session_state["start_date_val"] = default_start
+if "end_date_val" not in st.session_state:
+    st.session_state["end_date_val"] = default_end
 
-if st.session_state["start_date"] > st.session_state["end_date"]:
-    st.session_state["start_date"] = st.session_state["end_date"]
+if st.session_state["start_date_val"] > st.session_state["end_date_val"]:
+    st.session_state["start_date_val"] = st.session_state["end_date_val"]
 
 is_forced_batch_mode = (
     (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"]) or
@@ -607,39 +608,36 @@ if has_valid_dates:
     with cols_val5[2]:
         start_date = st.date_input(
             "起始日期", 
-            value=st.session_state["start_date"], 
-            max_value=st.session_state["end_date"], 
+            value=st.session_state["start_date_val"], 
+            max_value=st.session_state["end_date_val"], 
             key="start_date_input", 
             label_visibility="collapsed"
         )
-        st.session_state["start_date"] = start_date
+        st.session_state["start_date_val"] = start_date
 
     with cols_val5[3]:
         st.markdown('<div class="inline-sub-label">結束</div>', unsafe_allow_html=True)
     with cols_val5[4]:
         end_date = st.date_input(
             "結束日期", 
-            value=st.session_state["end_date"], 
-            min_value=st.session_state["start_date"], 
+            value=st.session_state["end_date_val"], 
+            min_value=st.session_state["start_date_val"], 
             max_value=today, 
             key="end_date_input", 
             label_visibility="collapsed"
         )
-        st.session_state["end_date"] = end_date
+        st.session_state["end_date_val"] = end_date
 
     with cols_val5[5]:
         if st.button("恢復預設", key="btn_reset_dates", use_container_width=True):
-            # 直接更新 session_state 中的日期輸入框對應 key，強制畫面同步重設
-            st.session_state["start_date_input"] = default_start
-            st.session_state["end_date_input"] = default_end
-            st.session_state["start_date"] = default_start
-            st.session_state["end_date"] = default_end
+            st.session_state["start_date_val"] = default_start
+            st.session_state["end_date_val"] = default_end
             st.rerun()
 
 filtered_df = final_df.copy()
 if has_valid_dates and len(filtered_df) > 0:
     try:
-        date_mask = (filtered_df["_dt"].dt.date >= start_date) & (filtered_df["_dt"].dt.date <= end_date)
+        date_mask = (filtered_df["_dt"].dt.date >= st.session_state["start_date_val"]) & (filtered_df["_dt"].dt.date <= st.session_state["end_date_val"])
         filtered_df = filtered_df[date_mask | filtered_df["_dt"].isna()]
     except Exception:
         pass
@@ -766,7 +764,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     clean_data["異常狀況"] = values.apply(check_anomaly)
 
     if use_date_axis:
-        date_str_range = f"{start_date.strftime('%Y/%m/%d')}-{end_date.strftime('%Y/%m/%d')}"
+        date_str_range = f"{st.session_state['start_date_val'].strftime('%Y/%m/%d')}-{st.session_state['end_date_val'].strftime('%Y/%m/%d')}"
     else:
         date_str_range = "全批號區間"
 
