@@ -1,4 +1,5 @@
 import os
+import re
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -287,7 +288,6 @@ def batch_sort_key(s):
         except ValueError:
             pass
             
-    import re
     digits = re.findall(r'\d+', s_str)
     if digits:
         try:
@@ -298,7 +298,6 @@ def batch_sort_key(s):
     return (1, 0, s_str)
 
 def natural_sort_key(s):
-    import re
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
 
 # ==================== 狀態回呼與瞬間聯動邏輯 ====================
@@ -571,7 +570,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕（結合動態 Key 確保強制刷新） ====================
+# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕 ====================
 today = date.today()
 current_year = today.year
 
@@ -633,7 +632,7 @@ if has_valid_dates:
         if st.button("恢復預設", key="btn_reset_dates", use_container_width=True):
             st.session_state["user_start_date"] = default_start
             st.session_state["user_end_date"] = default_end
-            st.session_state["date_reset_version"] += 1  # 變更版本號，強勢重置畫面元件
+            st.session_state["date_reset_version"] += 1
             st.rerun()
 
 filtered_df = final_df.copy()
@@ -770,11 +769,22 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         date_str_range = "全批號區間"
 
-    spec_display_part = f" ➔ <span style='color: #dc2626;'>{' / '.join(selected_specs)}</span>" if selected_specs else ""
+    # 抉擇 1：設定 Plotly 圖表標題最多顯示 6 項；抉擇 2：統計摘要維持完整不縮寫
+    MAX_DISPLAY_SPECS = 6
+    if not selected_specs:
+        spec_display_full = ""
+        spec_display_short = ""
+    else:
+        spec_display_full = f" ➔ <span style='color: #dc2626;'>{' / '.join(selected_specs)}</span>"
+        if len(selected_specs) <= MAX_DISPLAY_SPECS:
+            spec_display_short = spec_display_full
+        else:
+            shown_str = " / ".join(selected_specs[:MAX_DISPLAY_SPECS])
+            spec_display_short = f" ➔ <span style='color: #dc2626;'>{shown_str}...等共 {len(selected_specs)} 項</span>"
 
     summary_title_html = f"""
     <div class="highlight-title-box">
-        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_full} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
     </div>
     """
     st.markdown(summary_title_html, unsafe_allow_html=True)
@@ -818,12 +828,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    chart_title_html = f"""
-    <div class="highlight-title-box">
-        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_part} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖
-    </div>
-    """
-    st.markdown(chart_title_html, unsafe_allow_html=True)
+    # 組裝 Plotly 內部標題字串（採用 6 項縮寫版 spec_display_short）
+    plotly_chart_title_text = f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖</b>"
 
     fig = go.Figure()
     
@@ -1091,7 +1097,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             align="left",
             namelength=0
         ),
-        margin=dict(l=60, r=40, t=50, b=80),
+        margin=dict(l=60, r=40, t=58, b=80),
         legend=dict(
             y=0.5,
             yanchor="middle",
@@ -1135,7 +1141,45 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             spikedash="dash"
         )
     )
-    st.plotly_chart(fig, use_container_width=True, key="spc_main_chart")
+
+    # 將黃底邊框標題透過 add_annotation 寫入圖表畫布左上方
+    fig.add_annotation(
+        text=plotly_chart_title_text,
+        xref="paper", yref="paper",
+        x=0, y=1.03,
+        xanchor="left", yanchor="bottom",
+        showarrow=False,
+        font=dict(size=16, color="#713f12", family="sans-serif"),
+        bgcolor="#fef08a",
+        bordercolor="#fde047",
+        borderwidth=1,
+        borderpad=7
+    )
+
+    # 設定下載 PNG 的預設檔名（檔名獨立限制最多列前 3 項，並清除非法字元，避免檔名過長或破掉）
+    MAX_FILENAME_SPECS = 3
+    if not selected_specs:
+        safe_spec_str = ""
+    elif len(selected_specs) <= MAX_FILENAME_SPECS:
+        safe_spec_str = "_".join(selected_specs)
+    else:
+        safe_spec_str = f"{'_'.join(selected_specs[:MAX_FILENAME_SPECS])}_等{len(selected_specs)}項"
+
+    raw_filename = f"SPC_{selected_unit}_{selected_stage_label}_{selected_product}_{safe_spec_str}_{selected_param}"
+    safe_filename = re.sub(r'[\\/*?:"<>|]', "_", raw_filename)
+    safe_filename = re.sub(r'_+', "_", safe_filename).strip("_")
+
+    plotly_config = {
+        "toImageButtonOptions": {
+            "format": "png",
+            "filename": safe_filename,
+            "height": 600,
+            "width": 1800,
+            "scale": 2
+        }
+    }
+
+    st.plotly_chart(fig, use_container_width=True, key="spc_main_chart", config=plotly_config)
 
     abnormal_df = clean_data[clean_data["異常狀況"] != "Normal"].copy()
     
