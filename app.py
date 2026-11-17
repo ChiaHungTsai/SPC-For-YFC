@@ -213,8 +213,29 @@ st.markdown("""
         font-size: 16px;
         font-weight: 700;
         color: #713f12;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
         box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    
+    .missing-spec-hint {
+        font-size: 13px;
+        color: #475569;
+        margin: 0px 0px 6px 2px;
+        line-height: 1.4;
+    }
+    
+    .limit-conflict-alert {
+        background-color: #fff1f2;
+        border-left: 4px solid #e11d48;
+        border-top: 1px solid #fecdd3;
+        border-right: 1px solid #fecdd3;
+        border-bottom: 1px solid #fecdd3;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 13.5px;
+        color: #881337;
+        margin: 2px 0px 8px 0px;
+        line-height: 1.5;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -645,6 +666,67 @@ if has_valid_dates and len(filtered_df) > 0:
 
 st.markdown("<hr style='margin: 12px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
 
+# ==================== 跨取樣點規格界限 (USL/LSL/UCL/LCL) 一致性檢核函數 ====================
+def check_spec_limits_consistency(df_to_check, unit, stage_label, is_multi_exempt):
+    """
+    針對 USL, LSL, UCL, LCL 四個欄位進行完整一致性檢查。
+    回傳：(conflict_messages_list, conflicting_columns_set)
+    """
+    if is_multi_exempt or len(df_to_check) == 0:
+        return [], set()
+
+    has_spec_col = "取樣點/規格" in df_to_check.columns and df_to_check["取樣點/規格"].dropna().astype(str).str.strip().ne("").any()
+
+    conflicts = []
+    conflicting_cols = set()
+
+    for limit_col, limit_label in [("USL", "規格上限 USL"), ("LSL", "規格下限 LSL"), ("UCL", "管制上限 UCL"), ("LCL", "管制下限 LCL")]:
+        if limit_col not in df_to_check.columns:
+            continue
+        
+        if has_spec_col:
+            sub_specs = df_to_check["取樣點/規格"].dropna().astype(str).str.strip().unique()
+            spec_val_map = {}
+            distinct_signatures = set()
+            
+            for sp in sorted(sub_specs, key=natural_sort_key):
+                sp_rows = df_to_check[df_to_check["取樣點/規格"].astype(str).str.strip() == sp]
+                non_na_vals = sp_rows[limit_col].dropna().unique()
+                has_na = sp_rows[limit_col].isna().any()
+                
+                if len(non_na_vals) == 0:
+                    val_signature = ("EMPTY",)
+                    display_v = "未填(空白)"
+                elif len(non_na_vals) == 1 and not has_na:
+                    val_signature = ("VAL", float(non_na_vals[0]))
+                    display_v = f"{float(non_na_vals[0]):g}"
+                elif len(non_na_vals) == 1 and has_na:
+                    val_signature = ("MIXED_NA", float(non_na_vals[0]))
+                    display_v = f"{float(non_na_vals[0]):g} (含部分空白列)"
+                else:
+                    val_signature = ("MULTI", tuple(sorted([float(x) for x in non_na_vals])))
+                    display_v = " / ".join([f"{float(x):g}" for x in non_na_vals]) + " (同規格內數值不一致)"
+                    
+                spec_val_map[sp] = display_v
+                distinct_signatures.add(val_signature)
+                
+            if len(distinct_signatures) > 1 or any(sig[0] in ["MIXED_NA", "MULTI"] for sig in distinct_signatures):
+                detail_parts = [f"<b>{sp}</b>: {v}" for sp, v in spec_val_map.items()]
+                conflicts.append(f"• <b>{limit_label}</b> 設定不一致 ➔ " + " ｜ ".join(detail_parts))
+                conflicting_cols.add(limit_col)
+        else:
+            non_na_vals = df_to_check[limit_col].dropna().unique()
+            has_na = df_to_check[limit_col].isna().any()
+            if len(non_na_vals) > 1:
+                vals_str = " / ".join([f"{float(x):g}" for x in non_na_vals])
+                conflicts.append(f"• <b>{limit_label}</b> 出現多種不同數值 ➔ {vals_str}")
+                conflicting_cols.add(limit_col)
+            elif len(non_na_vals) == 1 and has_na:
+                conflicts.append(f"• <b>{limit_label}</b> 部分資料列漏填 ➔ {float(non_na_vals[0]):g} (含部分空白列)")
+                conflicting_cols.add(limit_col)
+                
+    return conflicts, conflicting_cols
+
 # ==================== 數據小數點位數讀取與圖表渲染 ====================
 if len(raw_specs_list) > 0 and len(selected_specs) == 0:
     st.warning("尚未選擇項目")
@@ -719,38 +801,56 @@ else:
     unique_batches = []
 
 if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
+    # 篩選出在目前 clean_data（該日期區間內）實際有測定值數據的規格清單 active_specs
+    if selected_specs and "取樣點/規格" in clean_data.columns:
+        present_specs_set = set(clean_data["取樣點/規格"].dropna().astype(str).str.strip().unique())
+        active_specs = [s for s in selected_specs if str(s).strip() in present_specs_set]
+        missing_specs = [s for s in selected_specs if str(s).strip() not in present_specs_set]
+    else:
+        active_specs = selected_specs.copy()
+        missing_specs = []
+
     values = clean_data["測定值"]
     mean_val = values.mean()
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
     n = len(values)
 
+    # 以實際有數據的 active_specs 數量判斷，若僅 1 個有效規格則自動顯示 USL/LSL/CL
     is_multi_spec_special = (
         (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"]) or
         (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC")
-    ) and len(selected_specs) > 1
+    ) and len(active_specs) > 1
 
-    if is_multi_spec_special:
+    # 檢查 USL/LSL/UCL/LCL 四個欄位是否 100% 一致
+    limit_conflicts, conflicting_cols = check_spec_limits_consistency(clean_data, selected_unit, selected_stage_label, is_multi_spec_special)
+    has_limit_conflict = len(conflicting_cols) > 0
+
+    # 抉擇 1（選項 B：全體連坐封鎖）：只要 USL/LSL/UCL/LCL 任一發生衝突，四個界限與 Cpk 全部強制設為 None (即顯示 N/A)
+    hide_all_limits_flag = is_multi_spec_special or has_limit_conflict
+
+    if hide_all_limits_flag:
         usl, lsl, ucl, lcl = None, None, None, None
+        cpk = None
     else:
         usl = float(clean_data["USL"].dropna().iloc[0]) if "USL" in clean_data.columns and len(clean_data["USL"].dropna()) > 0 else None
         lsl = float(clean_data["LSL"].dropna().iloc[0]) if "LSL" in clean_data.columns and len(clean_data["LSL"].dropna()) > 0 else None
         ucl = float(clean_data["UCL"].dropna().iloc[0]) if "UCL" in clean_data.columns and len(clean_data["UCL"].dropna()) > 0 else None
         lcl = float(clean_data["LCL"].dropna().iloc[0]) if "LCL" in clean_data.columns and len(clean_data["LCL"].dropna()) > 0 else None
 
-    cpu = (usl - mean_val) / (3 * std_val) if usl is not None and std_val > 0 else 0
-    cpl = (mean_val - lsl) / (3 * std_val) if lsl is not None and std_val > 0 else 0
-    
-    if usl is not None and lsl is not None:
-        cpk = min(cpu, cpl)
-    elif usl is not None:
-        cpk = cpu
-    elif lsl is not None:
-        cpk = cpl
-    else:
-        cpk = 0.0
+        cpu = (usl - mean_val) / (3 * std_val) if usl is not None and std_val > 0 else 0
+        cpl = (mean_val - lsl) / (3 * std_val) if lsl is not None and std_val > 0 else 0
+        
+        if usl is not None and lsl is not None:
+            cpk = min(cpu, cpl)
+        elif usl is not None:
+            cpk = cpu
+        elif lsl is not None:
+            cpk = cpl
+        else:
+            cpk = None
 
     def check_anomaly(val):
-        if is_multi_spec_special:
+        if hide_all_limits_flag:
             return "Normal"
             
         spec_violate = (usl is not None and val > usl) or (lsl is not None and val < lsl)
@@ -769,18 +869,18 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         date_str_range = "全批號區間"
 
-    # 抉擇 1：設定 Plotly 圖表標題最多顯示 6 項；抉擇 2：統計摘要維持完整不縮寫
+    # 使用實際有數據的 active_specs 來組裝統計摘要與管制圖標題
     MAX_DISPLAY_SPECS = 6
-    if not selected_specs:
+    if not active_specs:
         spec_display_full = ""
         spec_display_short = ""
     else:
-        spec_display_full = f" ➔ <span style='color: #dc2626;'>{' / '.join(selected_specs)}</span>"
-        if len(selected_specs) <= MAX_DISPLAY_SPECS:
+        spec_display_full = f" ➔ <span style='color: #dc2626;'>{' / '.join(active_specs)}</span>"
+        if len(active_specs) <= MAX_DISPLAY_SPECS:
             spec_display_short = spec_display_full
         else:
-            shown_str = " / ".join(selected_specs[:MAX_DISPLAY_SPECS])
-            spec_display_short = f" ➔ <span style='color: #dc2626;'>{shown_str}...等共 {len(selected_specs)} 項</span>"
+            shown_str = " / ".join(active_specs[:MAX_DISPLAY_SPECS])
+            spec_display_short = f" ➔ <span style='color: #dc2626;'>{shown_str}...等共 {len(active_specs)} 項</span>"
 
     summary_title_html = f"""
     <div class="highlight-title-box">
@@ -788,7 +888,31 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     </div>
     """
     st.markdown(summary_title_html, unsafe_allow_html=True)
-    st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
+
+    # 將無數據規格提示緊接在「統計摘要標題」下一列顯示（超過 6 項自動縮寫）
+    if missing_specs:
+        if len(missing_specs) <= MAX_DISPLAY_SPECS:
+            missing_display_str = " / ".join(missing_specs)
+        else:
+            missing_display_str = f"{' / '.join(missing_specs[:MAX_DISPLAY_SPECS])}...等共 {len(missing_specs)} 項"
+            
+        st.markdown(
+            f'<div class="missing-spec-hint">ℹ️ 提示：所選的「<span style="color: #b91c1c; font-weight: 600;">{missing_display_str}</span>」於目前日期區間 ({date_str_range}) 內無檢驗數據，已自動自標題與圖表中略過。</div>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
+
+    # 若發現 USL/LSL/UCL/LCL 任一不一致，主動發出紅框警告並告知已全體強制隱藏界限與 Cpk
+    if has_limit_conflict:
+        conflict_html = (
+            f'<div class="limit-conflict-alert">'
+            f'<b>🚨 規格/管制界限不一致警告（已強制將 USL / LSL / UCL / LCL 與 Cpk 全數鎖定設為 N/A）：</b><br>'
+            f'偵測到「{selected_unit} - {selected_product} ({selected_param})」於不同取樣點/規格下的界限設定未 100% 相同。請先修正 Google 試算表源頭資料並點擊上方「🔄 更新資料」：<br>'
+            + "<br>".join(limit_conflicts)
+            + '</div>'
+        )
+        st.markdown(conflict_html, unsafe_allow_html=True)
     
     def render_custom_metric(label, value, bg_color, border_color, label_color, unique_key):
         st.markdown(f"""
@@ -816,30 +940,41 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     with m3:
         render_custom_metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places), "#ffffff", "#cbd5e1", "#000000", "m3")
     with m4:
-        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if (usl is not None or lsl is not None) else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
+        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if cpk is not None else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
     with m5:
-        render_custom_metric("管制下限 (LCL)", "N/A" if is_multi_spec_special else (fmt_str.format(lcl) if lcl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m5")
+        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m5")
     with m6:
-        render_custom_metric("管制上限 (UCL)", "N/A" if is_multi_spec_special else (fmt_str.format(ucl) if ucl is not None else "N/A"), "#fff7ed", "#f97316", "#c2410c", "m6")
+        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m6")
     with m7:
-        render_custom_metric("規格下限 (LSL)", "N/A" if is_multi_spec_special else (fmt_str.format(lsl) if lsl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m7")
+        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m7")
     with m8:
-        render_custom_metric("規格上限 (USL)", "N/A" if is_multi_spec_special else (fmt_str.format(usl) if usl is not None else "N/A"), "#fef2f2", "#ef4444", "#b91c1c", "m8")
+        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m8")
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 組裝 Plotly 內部標題字串（採用 6 項縮寫版 spec_display_short）
-    plotly_chart_title_text = f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short} ➔ <span style='color: #dc2626;'>{selected_param}</span> 管制圖</b>"
+    # 抉擇 2（選項 A：智慧換行）：當內部標題過長（>62字元）或有效規格 >= 4 項時，自動分為上下兩列顯示（<br>）
+    single_line_title = f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 管制圖</b>"
+    plain_title_len = len(re.sub(r'<[^>]+>', '', single_line_title))
+
+    if plain_title_len > 62 or len(active_specs) >= 4:
+        plotly_chart_title_text = (
+            f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short}</b>"
+            f"<br><b>➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 管制圖</b>"
+        )
+        dynamic_margin_t = 96
+    else:
+        plotly_chart_title_text = single_line_title
+        dynamic_margin_t = 68
 
     fig = go.Figure()
     
-    if len(selected_specs) > 1 and "取樣點/規格" in clean_data.columns:
+    if len(active_specs) > 1 and "取樣點/規格" in clean_data.columns:
         color_palette = [
             '#111827', '#0066ff', '#059669', '#d97706', '#9333ea',
             '#e11d48', '#0284c7', '#10b981', '#7c3aed', '#ca8a04'
         ]
         
-        for idx, sub_spec in enumerate(selected_specs):
+        for idx, sub_spec in enumerate(active_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
             if len(sub_df) == 0:
                 continue
@@ -866,7 +1001,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                             m_sizes.append(0)
                             custom_data.append("")
                     
-                    if is_multi_spec_special:
+                    if hide_all_limits_flag:
                         is_spec, is_ctrl = False, False
                     else:
                         is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
@@ -908,7 +1043,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         custom_data.append("")
                         continue
                     
-                    if is_multi_spec_special:
+                    if hide_all_limits_flag:
                         is_spec, is_ctrl = False, False
                     else:
                         is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
@@ -965,7 +1100,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                         m_sizes.append(0)
                         custom_data.append("")
                 
-                if is_multi_spec_special:
+                if hide_all_limits_flag:
                     is_spec, is_ctrl = False, False
                 else:
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
@@ -1007,7 +1142,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     custom_data.append("")
                     continue
                 
-                if is_multi_spec_special:
+                if hide_all_limits_flag:
                     is_spec, is_ctrl = False, False
                 else:
                     is_spec = (usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl)
@@ -1033,10 +1168,12 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 else:
                     custom_data.append(formatted_val)
 
+        single_trace_name = active_specs[0] if len(active_specs) == 1 else selected_param
+
         fig.add_trace(go.Scatter(
             x=plot_x, y=plot_y,
             mode='lines+markers',
-            name=selected_param,
+            name=single_trace_name,
             hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
             customdata=custom_data,
             line=dict(color='#0066ff', width=2),
@@ -1052,7 +1189,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 annotation_position="bottom right"
             )
     
-    if not is_multi_spec_special:
+    if not hide_all_limits_flag:
         if ucl is not None:
             fig.add_hline(
                 y=ucl, line_dash="dot", line_color="#f97316", 
@@ -1097,7 +1234,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             align="left",
             namelength=0
         ),
-        margin=dict(l=60, r=40, t=58, b=80),
+        margin=dict(l=60, r=40, t=dynamic_margin_t, b=80),
         legend=dict(
             y=0.5,
             yanchor="middle",
@@ -1142,12 +1279,14 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         )
     )
 
-    # 將黃底邊框標題透過 add_annotation 寫入圖表畫布左上方
+    # 寫入支援雙列智慧換行與左對齊的黃框標題，下緣與圖表上框保持明顯間隙
     fig.add_annotation(
         text=plotly_chart_title_text,
         xref="paper", yref="paper",
-        x=0, y=1.03,
+        x=0, y=1.05,
+        yshift=2,
         xanchor="left", yanchor="bottom",
+        align="left",
         showarrow=False,
         font=dict(size=16, color="#713f12", family="sans-serif"),
         bgcolor="#fef08a",
@@ -1156,16 +1295,16 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         borderpad=7
     )
 
-    # 設定下載 PNG 的預設檔名（檔名獨立限制最多列前 3 項，並清除非法字元，避免檔名過長或破掉）
+    # 設定下載 PNG 的預設檔名
     MAX_FILENAME_SPECS = 3
-    if not selected_specs:
+    if not active_specs:
         safe_spec_str = ""
-    elif len(selected_specs) <= MAX_FILENAME_SPECS:
-        safe_spec_str = "_".join(selected_specs)
+    elif len(active_specs) <= MAX_FILENAME_SPECS:
+        safe_spec_str = "_".join(active_specs)
     else:
-        safe_spec_str = f"{'_'.join(selected_specs[:MAX_FILENAME_SPECS])}_等{len(selected_specs)}項"
+        safe_spec_str = f"{'_'.join(active_specs[:MAX_FILENAME_SPECS])}_等{len(active_specs)}項"
 
-    raw_filename = f"SPC_{selected_unit}_{selected_stage_label}_{selected_product}_{safe_spec_str}_{selected_param}"
+    raw_filename = f"SPC_{selected_unit}_{selected_stage_label}_{selected_product}_{safe_spec_str}_{selected_param}_{date_str_range}"
     safe_filename = re.sub(r'[\\/*?:"<>|]', "_", raw_filename)
     safe_filename = re.sub(r'_+', "_", safe_filename).strip("_")
 
@@ -1173,7 +1312,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         "toImageButtonOptions": {
             "format": "png",
             "filename": safe_filename,
-            "height": 600,
+            "height": 640 if dynamic_margin_t > 70 else 600,
             "width": 1800,
             "scale": 2
         }
@@ -1183,7 +1322,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
 
     abnormal_df = clean_data[clean_data["異常狀況"] != "Normal"].copy()
     
-    if len(abnormal_df) > 0:
+    if has_limit_conflict:
+        st.error("🚨 因規格或管制界限設定不一致，異常點判定與界限線已全數暫停隱藏。請先修正 Google 試算表源頭資料。")
+    elif len(abnormal_df) > 0:
         spec_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出規格範圍"])
         control_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出管制範圍"])
         
@@ -1239,4 +1380,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         st.dataframe(clean_data.drop(columns=["_dt", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
         
 elif len(raw_specs_list) > 0 and len(selected_specs) > 0:
-    st.warning("該篩選條件下沒有對應的數據。")
+    if has_valid_dates:
+        locked_range_str = f"{st.session_state['user_start_date'].strftime('%Y/%m/%d')} - {st.session_state['user_end_date'].strftime('%Y/%m/%d')}"
+        st.warning(f"⚠️ 該篩選條件於目前鎖定的日期區間（{locked_range_str}）內沒有對應的檢驗數據，請調整上方檢驗日期或點擊「恢復預設」。")
+    else:
+        st.warning("⚠️ 該篩選條件下沒有對應的檢驗數據。")
