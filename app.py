@@ -1023,11 +1023,26 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         
         st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 <span style="color: #000000;">(總樣本數：{total_count:,} 筆 ｜ 超出規格範圍：{spec_count} 筆 [{spec_pct:.2f}%] ｜ 超出管制範圍：{control_count} 筆 [{control_pct:.2f}%])</span></div>', unsafe_allow_html=True)
         
+        has_spec_in_abnormal = "取樣點/規格" in abnormal_df.columns and abnormal_df["取樣點/規格"].dropna().astype(str).str.strip().ne("").any()
+        
         col_name_mapping = {
-            "異常狀況": "異常狀況", active_batch_col: active_batch_col, "檢驗日期": "檢驗日期", "測定值": "測定值",
-            "USL": "規格上限 (USL)", "LSL": "規格下限 (LSL)", "UCL": "管制上限 (UCL)", "LCL": "管制下限 (LCL)"
+            "異常狀況": "異常狀況",
+            "取樣點/規格": spec_label_text,
+            active_batch_col: active_batch_col,
+            "檢驗日期": "檢驗日期",
+            "測定值": "測定值",
+            "USL": "規格上限 (USL)",
+            "LSL": "規格下限 (LSL)",
+            "UCL": "管制上限 (UCL)",
+            "LCL": "管制下限 (LCL)"
         }
-        display_cols = [c for c in ["異常狀況", active_batch_col, "檢驗日期", "測定值", "USL", "LSL", "UCL", "LCL"] if c in abnormal_df.columns or c == "異常狀況"]
+        
+        candidate_cols = ["異常狀況"]
+        if has_spec_in_abnormal:
+            candidate_cols.append("取樣點/規格")
+        candidate_cols.extend([active_batch_col, "檢驗日期", "測定值", "USL", "LSL", "UCL", "LCL"])
+        
+        display_cols = [c for c in candidate_cols if c is not None and (c in abnormal_df.columns or c == "異常狀況")]
         
         table_html = '<table class="custom-alert-table"><thead><tr>'
         for col in display_cols:
@@ -1046,7 +1061,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     val_str = f"{val:.{decimal_places}f}"
                 else:
                     val_str = str(val)
-                table_html += f'<td>{val_str}</td>'
+                safe_title = val_str.replace('"', '&quot;')
+                table_html += f'<td title="{safe_title}">{val_str}</td>'
             table_html += '</tr>'
         table_html += '</tbody></table>'
         st.markdown(table_html, unsafe_allow_html=True)
