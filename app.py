@@ -548,7 +548,25 @@ if has_valid_dates and len(filtered_df) > 0:
 
 st.markdown("<hr style='margin: 12px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
 
-# ==================== 跨取樣點規格界限 (USL/LSL/UCL/LCL) 一致性檢核函數 ====================
+# ==================== 跨取樣點規格界限 (USL/LSL/UCL/LCL) 一致性檢核函數（全歷史區間 final_df） ====================
+def format_locator_hint(rows_df):
+    """提取異常資料列的批號或檢驗日期（最多顯示前 3 筆），加速回 Google Sheet 抓錯"""
+    if len(rows_df) == 0:
+        return ""
+    b_col = next((c for c in ["批號", "批次", "檢驗批號"] if c in rows_df.columns and rows_df[c].dropna().astype(str).str.strip().ne("").any()), None)
+    loc_items = []
+    for _, r in rows_df.head(3).iterrows():
+        b_val = str(r[b_col]).strip() if b_col and pd.notna(r[b_col]) and str(r[b_col]).strip() != "" else ""
+        d_val = str(r["檢驗日期"]).strip() if "檢驗日期" in rows_df.columns and pd.notna(r["檢驗日期"]) and str(r["檢驗日期"]).strip() != "" else ""
+        if b_val and d_val:
+            loc_items.append(f"{d_val}({b_val})")
+        elif b_val or d_val:
+            loc_items.append(b_val or d_val)
+    if not loc_items:
+        return ""
+    suffix = f"...等共{len(rows_df)}筆" if len(rows_df) > 3 else ""
+    return f" [例: {', '.join(loc_items)}{suffix}]"
+
 def check_spec_limits_consistency(df_to_check, unit, stage_label, is_multi_exempt):
     if is_multi_exempt or len(df_to_check) == 0:
         return [], set()
@@ -575,10 +593,15 @@ def check_spec_limits_consistency(df_to_check, unit, stage_label, is_multi_exemp
                     display_v = f"{float(non_na_vals[0]):g}"
                 elif len(non_na_vals) == 1 and has_na:
                     val_signature = ("MIXED_NA", float(non_na_vals[0]))
-                    display_v = f"{float(non_na_vals[0]):g} (含部分空白列)"
+                    na_rows = sp_rows[sp_rows[limit_col].isna()]
+                    display_v = f"{float(non_na_vals[0]):g} (含部分空白列{format_locator_hint(na_rows)})"
                 else:
                     val_signature = ("MULTI", tuple(sorted([float(x) for x in non_na_vals])))
-                    display_v = " / ".join([f"{float(x):g}" for x in non_na_vals]) + " (同規格內數值不一致)"
+                    val_counts = sp_rows[limit_col].dropna().value_counts()
+                    minority_val = val_counts.index[-1]
+                    min_rows = sp_rows[sp_rows[limit_col] == minority_val]
+                    vals_str = " / ".join([f"{float(x):g}" for x in non_na_vals])
+                    display_v = f"{vals_str} (同規格內數值不一致，少數值 {float(minority_val):g}{format_locator_hint(min_rows)})"
                 spec_val_map[sp] = display_v
                 distinct_signatures.add(val_signature)
             if len(distinct_signatures) > 1 or any(sig[0] in ["MIXED_NA", "MULTI"] for sig in distinct_signatures):
@@ -589,11 +612,15 @@ def check_spec_limits_consistency(df_to_check, unit, stage_label, is_multi_exemp
             non_na_vals = df_to_check[limit_col].dropna().unique()
             has_na = df_to_check[limit_col].isna().any()
             if len(non_na_vals) > 1:
+                val_counts = df_to_check[limit_col].dropna().value_counts()
+                minority_val = val_counts.index[-1]
+                min_rows = df_to_check[df_to_check[limit_col] == minority_val]
                 vals_str = " / ".join([f"{float(x):g}" for x in non_na_vals])
-                conflicts.append(f"• <b>{limit_label}</b> 出現多種不同數值 ➔ {vals_str}")
+                conflicts.append(f"• <b>{limit_label}</b> 出現多種不同數值 ➔ {vals_str} (少數值 {float(minority_val):g}{format_locator_hint(min_rows)})")
                 conflicting_cols.add(limit_col)
             elif len(non_na_vals) == 1 and has_na:
-                conflicts.append(f"• <b>{limit_label}</b> 部分資料列漏填 ➔ {float(non_na_vals[0]):g} (含部分空白列)")
+                na_rows = df_to_check[df_to_check[limit_col].isna()]
+                conflicts.append(f"• <b>{limit_label}</b> 部分資料列漏填 ➔ {float(non_na_vals[0]):g} (含部分空白列{format_locator_hint(na_rows)})")
                 conflicting_cols.add(limit_col)
     return conflicts, conflicting_cols
 
@@ -667,12 +694,25 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
     n = len(values)
 
+    # 決策二（方案B）：針對全歷史區間有效數據（final_df 排除無測定值之空列）進行無差別界限一致性檢查
+    full_valid_df = final_df.dropna(subset=["測定值"]).copy() if "測定值" in final_df.columns else pd.DataFrame()
+    if selected_specs and "取樣點/規格" in full_valid_df.columns:
+        full_present_specs = set(full_valid_df["取樣點/規格"].dropna().astype(str).str.strip().unique())
+        full_active_specs = [s for s in selected_specs if str(s).strip() in full_present_specs]
+    else:
+        full_active_specs = selected_specs.copy()
+
     is_multi_spec_special = (
         (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"]) or
         (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC")
     ) and len(active_specs) > 1
 
-    limit_conflicts, conflicting_cols = check_spec_limits_consistency(clean_data, selected_unit, selected_stage_label, is_multi_spec_special)
+    is_multi_spec_exempt_full = (
+        (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"]) or
+        (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC")
+    ) and len(full_active_specs) > 1
+
+    limit_conflicts, conflicting_cols = check_spec_limits_consistency(full_valid_df, selected_unit, selected_stage_label, is_multi_spec_exempt_full)
     has_limit_conflict = len(conflicting_cols) > 0
 
     hide_all_limits_flag = is_multi_spec_special or has_limit_conflict
@@ -709,21 +749,20 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     clean_data["異常狀況"] = values.apply(check_anomaly)
     date_str_range = f"{st.session_state['user_start_date'].strftime('%Y/%m/%d')}-{st.session_state['user_end_date'].strftime('%Y/%m/%d')}" if use_date_axis else "全批號區間"
 
-    MAX_DISPLAY_SPECS = 6
+    # 決策一（方案A + MAX_DISPLAY_SPECS = 8）：最多顯示 8 項規格，統計摘要與管制圖共用縮寫上限
+    MAX_DISPLAY_SPECS = 8
     if not active_specs:
-        spec_display_full = ""
         spec_display_short = ""
     else:
-        spec_display_full = f" ➔ <span style='color: #dc2626;'>{' / '.join(active_specs)}</span>"
         if len(active_specs) <= MAX_DISPLAY_SPECS:
-            spec_display_short = spec_display_full
+            spec_display_short = f" ➔ <span style='color: #dc2626;'>{' / '.join(active_specs)}</span>"
         else:
             shown_str = " / ".join(active_specs[:MAX_DISPLAY_SPECS])
             spec_display_short = f" ➔ <span style='color: #dc2626;'>{shown_str}...等共 {len(active_specs)} 項</span>"
 
     summary_title_html = f"""
     <div class="highlight-title-box">
-        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_full} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
     </div>
     """
     st.markdown(summary_title_html, unsafe_allow_html=True)
@@ -740,8 +779,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     if has_limit_conflict:
         conflict_html = (
             f'<div class="limit-conflict-alert">'
-            f'<b>🚨 規格/管制界限不一致警告（已強制將 USL / LSL / UCL / LCL 與 Cpk 全數鎖定設為 N/A）：</b><br>'
-            f'偵測到「{selected_unit} - {selected_product} ({selected_param})」於不同取樣點/規格下的界限設定未 100% 相同。請先修正 Google 試算表源頭資料並點擊上方「🔄 更新資料」：<br>'
+            f'<b>🚨 全歷史區間規格/管制界限不一致警告（已強制將 USL / LSL / UCL / LCL 與 Cpk 全數鎖定設為 N/A）：</b><br>'
+            f'偵測到「{selected_unit} - {selected_product} ({selected_param})」於全歷史資料中不同取樣點/規格下的界限設定未 100% 相同。請先修正 Google 試算表源頭資料並點擊上方「🔄 更新資料」：<br>'
             + "<br>".join(limit_conflicts)
             + '</div>'
         )
@@ -785,24 +824,27 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 智慧換行規則：字數超過 200 字 或 規格 >= 8 項 時才分成兩列；短標題維持單列
+    # 決策一（方案A）：當單列字數 > 85 字 或 有效規格 >= 5 項時自動切成兩列，最多顯示 8 項規格
     single_line_title = f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 管制圖</b>"
     plain_title_len = len(re.sub(r'<[^>]+>', '', single_line_title))
 
-    if plain_title_len > 200 or len(active_specs) >= 8:
+    if plain_title_len > 85 or len(active_specs) >= 5:
+        line1_plain_len = len(re.sub(r'<[^>]+>', '', f"{selected_unit} ➔ {selected_stage_label} ➔ {selected_product}{spec_display_short}"))
         plotly_chart_title_text = (
             f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short}</b>"
             f"<br><b>➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 管制圖</b>"
         )
         dynamic_margin_t = 96
-        dynamic_title_font_size = 16
+        if line1_plain_len > 105:
+            dynamic_title_font_size = 13.5
+        elif line1_plain_len > 85:
+            dynamic_title_font_size = 14.5
+        else:
+            dynamic_title_font_size = 16
     else:
         plotly_chart_title_text = single_line_title
         dynamic_margin_t = 68
-        # 當維持單列但字數偏長時，自動微調字體避免超出右邊界
-        if plain_title_len > 95:
-            dynamic_title_font_size = 13
-        elif plain_title_len > 75:
+        if plain_title_len > 75:
             dynamic_title_font_size = 14.5
         else:
             dynamic_title_font_size = 16
@@ -891,14 +933,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             customdata=custom_data, line=dict(color='#0066ff', width=2),
             marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols), connectgaps=False
         ))
-        if not is_multi_spec_special:
-            fig.add_hline(
-                y=mean_val, line_dash="solid", line_color="#10b981",
-                annotation_text=f"CL: {fmt_str.format(mean_val)}",
-                annotation_font_color="#10b981", annotation_position="bottom right"
-            )
     
     if not hide_all_limits_flag:
+        fig.add_hline(
+            y=mean_val, line_dash="solid", line_color="#10b981",
+            annotation_text=f"CL: {fmt_str.format(mean_val)}",
+            annotation_font_color="#10b981", annotation_position="bottom right"
+        )
         if ucl is not None:
             fig.add_hline(y=ucl, line_dash="dot", line_color="#f97316", annotation_text=f"UCL: {fmt_str.format(ucl)}", annotation_font_color="#f97316", annotation_position="top left")
         if lcl is not None:
@@ -972,7 +1013,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     abnormal_df = clean_data[clean_data["異常狀況"] != "Normal"].copy()
     
     if has_limit_conflict:
-        st.error("🚨 因規格或管制界限設定不一致，異常點判定與界限線已全數暫停隱藏。請先修正 Google 試算表源頭資料。")
+        st.error("🚨 因全歷史區間內規格或管制界限設定不一致，異常點判定與界限線已全數暫停隱藏。請先依上方紅框提示修正 Google 試算表源頭資料。")
     elif len(abnormal_df) > 0:
         spec_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出規格範圍"])
         control_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出管制範圍"])
