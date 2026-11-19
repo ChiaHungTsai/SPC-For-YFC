@@ -213,16 +213,24 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Google 試算表遠端 CSV 讀取設定
+# 3. Google 試算表遠端 CSV 讀取設定（含斷線備援機制）
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgSWa6LTNxRQYImmAZkHX2JbsNkuROSpb_4Q3u6VJ05k72wsTjQ3eq8TMRtn3JpMEg59jlqYqoTk0_/pub?gid=729038536&single=true&output=csv"
 
 @st.cache_data(ttl=60)
+def fetch_raw_csv(url):
+    return pd.read_csv(url, dtype=str)
+
 def load_and_preprocess_data(url):
     try:
-        temp_df = pd.read_csv(url, dtype=str)
+        temp_df = fetch_raw_csv(url).copy()
+        st.session_state["backup_df"] = temp_df.copy()
     except Exception as e:
-        st.error(f"讀取 Google 試算表失敗，請檢查網路連線或共用權限設定。錯誤訊息: {e}")
-        st.stop()
+        if "backup_df" in st.session_state and isinstance(st.session_state["backup_df"], pd.DataFrame) and len(st.session_state["backup_df"]) > 0:
+            st.toast(f"⚠️ 遠端試算表連線瞬斷，暫時沿用先前快取資料：{e}", icon="⚠️")
+            temp_df = st.session_state["backup_df"].copy()
+        else:
+            st.error(f"讀取 Google 試算表失敗，請檢查網路連線或共用權限設定。錯誤訊息: {e}")
+            st.stop()
         
     temp_df.columns = [c.strip() for c in temp_df.columns]
     
@@ -289,16 +297,16 @@ def natural_sort_key(s):
 def on_unit_change():
     st.session_state.pop("selected_stage", None)
     st.session_state.pop("current_product", None)
-    st.session_state.pop("current_spec", None)
+    st.session_state["current_spec"] = "__AUTO_SELECT__"
     st.session_state.pop("current_param", None)
 
 def on_stage_change():
     st.session_state.pop("current_product", None)
-    st.session_state.pop("current_spec", None)
+    st.session_state["current_spec"] = "__AUTO_SELECT__"
     st.session_state.pop("current_param", None)
 
 def on_product_change():
-    st.session_state.pop("current_spec", None)
+    st.session_state["current_spec"] = "__AUTO_SELECT__"
     st.session_state.pop("current_param", None)
 
 def on_spec_change():
@@ -317,7 +325,7 @@ with header_cols[0]:
 with header_cols[1]:
     st.markdown('<div class="refresh-btn-fixed">', unsafe_allow_html=True)
     if st.button("🔄 更新資料", use_container_width=False):
-        st.cache_data.clear()
+        fetch_raw_csv.clear()
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -401,6 +409,10 @@ for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
 is_fanlishui_special = (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"])
+is_multi_limit_exempt_unit_stage = (
+    (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"]) or
+    (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC")
+)
 product_label_text = "樣品種類" if is_fanlishui_special else "樣品名稱"
 spec_label_text = "樣品名稱" if is_fanlishui_special else "取樣點/規格"
 
@@ -427,8 +439,16 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = sorted([str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]], key=natural_sort_key)
 
-if "current_spec" not in st.session_state or not isinstance(st.session_state["current_spec"], list):
-    st.session_state["current_spec"] = []
+# 第 3 項盲點處置：切換單位/階段/產品時自動預選（一般課別預設全選；凡立水/雙氧水多規格預設選第 1 項）
+if "current_spec" not in st.session_state or st.session_state["current_spec"] == "__AUTO_SELECT__":
+    if len(raw_specs_list) == 0:
+        st.session_state["current_spec"] = []
+    elif is_multi_limit_exempt_unit_stage and len(raw_specs_list) > 1:
+        st.session_state["current_spec"] = [raw_specs_list[0]]
+    else:
+        st.session_state["current_spec"] = raw_specs_list.copy()
+elif not isinstance(st.session_state["current_spec"], list):
+    st.session_state["current_spec"] = raw_specs_list.copy() if len(raw_specs_list) > 0 else []
 else:
     st.session_state["current_spec"] = [s for s in st.session_state["current_spec"] if s in raw_specs_list]
 
@@ -694,7 +714,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     std_val = values.std(ddof=1) if len(values) > 1 else 0.0
     n = len(values)
 
-    # 決策二（方案B）：針對全歷史區間有效數據（final_df 排除無測定值之空列）進行無差別界限一致性檢查
     full_valid_df = final_df.dropna(subset=["測定值"]).copy() if "測定值" in final_df.columns else pd.DataFrame()
     if selected_specs and "取樣點/規格" in full_valid_df.columns:
         full_present_specs = set(full_valid_df["取樣點/規格"].dropna().astype(str).str.strip().unique())
@@ -702,15 +721,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     else:
         full_active_specs = selected_specs.copy()
 
-    is_multi_spec_special = (
-        (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"]) or
-        (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC")
-    ) and len(active_specs) > 1
-
-    is_multi_spec_exempt_full = (
-        (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC"]) or
-        (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC")
-    ) and len(full_active_specs) > 1
+    is_multi_spec_special = is_multi_limit_exempt_unit_stage and len(active_specs) > 1
+    is_multi_spec_exempt_full = is_multi_limit_exempt_unit_stage and len(full_active_specs) > 1
 
     limit_conflicts, conflicting_cols = check_spec_limits_consistency(full_valid_df, selected_unit, selected_stage_label, is_multi_spec_exempt_full)
     has_limit_conflict = len(conflicting_cols) > 0
@@ -726,14 +738,16 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         ucl = float(clean_data["UCL"].dropna().iloc[0]) if "UCL" in clean_data.columns and len(clean_data["UCL"].dropna()) > 0 else None
         lcl = float(clean_data["LCL"].dropna().iloc[0]) if "LCL" in clean_data.columns and len(clean_data["LCL"].dropna()) > 0 else None
 
-        cpu = (usl - mean_val) / (3 * std_val) if usl is not None and std_val > 0 else 0
-        cpl = (mean_val - lsl) / (3 * std_val) if lsl is not None and std_val > 0 else 0
-        if usl is not None and lsl is not None:
-            cpk = min(cpu, cpl)
-        elif usl is not None:
-            cpk = cpu
-        elif lsl is not None:
-            cpk = cpl
+        # Bug 修正：標準差為 0（如 n=1 或數值全等）時分母為 0，Cpk 應為 None（顯示 N/A）而非誤算為 0
+        if std_val > 0 and (usl is not None or lsl is not None):
+            cpu = (usl - mean_val) / (3 * std_val) if usl is not None else None
+            cpl = (mean_val - lsl) / (3 * std_val) if lsl is not None else None
+            if cpu is not None and cpl is not None:
+                cpk = min(cpu, cpl)
+            elif cpu is not None:
+                cpk = cpu
+            else:
+                cpk = cpl
         else:
             cpk = None
 
@@ -749,7 +763,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     clean_data["異常狀況"] = values.apply(check_anomaly)
     date_str_range = f"{st.session_state['user_start_date'].strftime('%Y/%m/%d')}-{st.session_state['user_end_date'].strftime('%Y/%m/%d')}" if use_date_axis else "全批號區間"
 
-    # 決策一（方案A + MAX_DISPLAY_SPECS = 8）：最多顯示 8 項規格，統計摘要與管制圖共用縮寫上限
     MAX_DISPLAY_SPECS = 8
     if not active_specs:
         spec_display_short = ""
@@ -824,7 +837,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     
     st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
 
-    # 決策一（方案A）：當單列字數 > 85 字 或 有效規格 >= 5 項時自動切成兩列，最多顯示 8 項規格
     single_line_title = f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 管制圖</b>"
     plain_title_len = len(re.sub(r'<[^>]+>', '', single_line_title))
 
