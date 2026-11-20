@@ -697,13 +697,21 @@ def check_spec_limits_consistency(df_to_check, unit, stage_label, is_multi_exemp
     return conflicts, conflicting_cols
 
 # ==================== 數據小數點位數讀取與圖表渲染 ====================
+clean_data = pd.DataFrame()
+decimal_places = 2
+fmt_str = "{:.2f}"
+plotly_fmt = ".2f"
+xaxis_title_text = "日期"
+use_date_axis = False
+active_batch_col = None
+unique_batches = []
+
 if len(raw_specs_list) > 0 and len(selected_specs) == 0:
     st.warning("尚未選擇項目")
 elif show_year_selector and len(selected_years) == 0:
     st.warning("尚未選擇檢驗年份")
 elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     clean_data = filtered_df.dropna(subset=["測定值"]).copy()
-    decimal_places = 2
     has_custom_dec = False
     if "小數位數" in clean_data.columns:
         valid_dec_series = clean_data["小數位數"].dropna()
@@ -756,15 +764,6 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
             clean_data = clean_data.reset_index(drop=True)
             unique_batches = []
             xaxis_title_text = "序號"
-else:
-    clean_data = pd.DataFrame()
-    decimal_places = 2
-    fmt_str = "{:.2f}"
-    plotly_fmt = ".2f"
-    xaxis_title_text = "日期"
-    use_date_axis = False
-    active_batch_col = None
-    unique_batches = []
 
 if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0:
     if selected_specs and "取樣點/規格" in clean_data.columns:
