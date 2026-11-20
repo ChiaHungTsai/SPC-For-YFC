@@ -257,7 +257,6 @@ def load_and_preprocess_data(url):
             temp_df[limit_col] = pd.to_numeric(temp_df[limit_col], errors='coerce')
             
     if "檢驗日期" in temp_df.columns:
-        # 僅當字串非純 4 位數年份時才轉完整日期，避免純年份（如 "2026"）被誤解為 2026-01-01
         raw_date_str = temp_df["檢驗日期"].astype(str).str.strip()
         is_pure_year = raw_date_str.str.match(r"^(19|20)\d{2}$", na=False)
         parsed_dt = pd.to_datetime(raw_date_str.where(~is_pure_year, np.nan), format='mixed', errors='coerce')
@@ -458,7 +457,6 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = sorted([str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]], key=natural_sort_key)
 
-# 預選邏輯：一般課別或單一取樣點預設全選；豁免多規格課別預設選第 1 項
 if "current_spec" not in st.session_state or st.session_state["current_spec"] == "__AUTO_SELECT__":
     if len(raw_specs_list) == 0:
         st.session_state["current_spec"] = []
@@ -592,7 +590,7 @@ elif show_year_selector:
     else:
         st.session_state["current_years"] = [y for y in st.session_state["current_years"] if y in available_years]
 
-    cols_val5 = st.columns([0.95, 3.0, 6.45])
+    cols_val5 = st.columns([0.7, 3.6, 6.1])
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗年份</div>', unsafe_allow_html=True)
     with cols_val5[1]:
