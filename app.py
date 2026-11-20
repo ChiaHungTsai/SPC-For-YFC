@@ -243,7 +243,7 @@ def load_and_preprocess_data(url):
     if prod_col and prod_col != "樣品名稱":
         temp_df = temp_df.rename(columns={prod_col: "樣品名稱"})
         
-    for col in ["單位", "階段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL"]:
+    for col in ["單位", "階段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL", "檢驗日期"]:
         if col in temp_df.columns:
             temp_df[col] = temp_df[col].astype(str).str.strip()
             temp_df.loc[temp_df[col].isin(["nan", "NaN", "None", "NAT", "nat", ""]), col] = np.nan
@@ -257,9 +257,25 @@ def load_and_preprocess_data(url):
             temp_df[limit_col] = pd.to_numeric(temp_df[limit_col], errors='coerce')
             
     if "檢驗日期" in temp_df.columns:
-        temp_df["_dt"] = pd.to_datetime(temp_df["檢驗日期"], format='mixed', errors='coerce')
+        # 僅當字串非純 4 位數年份時才轉完整日期，避免純年份（如 "2026"）被誤解為 2026-01-01
+        raw_date_str = temp_df["檢驗日期"].astype(str).str.strip()
+        is_pure_year = raw_date_str.str.match(r"^(19|20)\d{2}$", na=False)
+        parsed_dt = pd.to_datetime(raw_date_str.where(~is_pure_year, np.nan), format='mixed', errors='coerce')
+        temp_df["_dt"] = parsed_dt
+
+        def extract_year_val(row):
+            s_val = str(row["檢驗日期"]).strip() if pd.notna(row["檢驗日期"]) else ""
+            m4 = re.search(r"\b((?:19|20)\d{2})\b", s_val)
+            if m4:
+                return m4.group(1)
+            if pd.notna(row["_dt"]):
+                return str(row["_dt"].year)
+            return np.nan
+
+        temp_df["_year"] = temp_df.apply(extract_year_val, axis=1)
     else:
         temp_df["_dt"] = pd.NaT
+        temp_df["_year"] = np.nan
             
     return temp_df
 
@@ -299,15 +315,18 @@ def on_unit_change():
     st.session_state.pop("current_product", None)
     st.session_state["current_spec"] = "__AUTO_SELECT__"
     st.session_state.pop("current_param", None)
+    st.session_state["current_years"] = "__AUTO_SELECT_YEARS__"
 
 def on_stage_change():
     st.session_state.pop("current_product", None)
     st.session_state["current_spec"] = "__AUTO_SELECT__"
     st.session_state.pop("current_param", None)
+    st.session_state["current_years"] = "__AUTO_SELECT_YEARS__"
 
 def on_product_change():
     st.session_state["current_spec"] = "__AUTO_SELECT__"
     st.session_state.pop("current_param", None)
+    st.session_state["current_years"] = "__AUTO_SELECT_YEARS__"
 
 def on_spec_change():
     pass
@@ -439,6 +458,7 @@ prod_df = stage_df[(stage_df["樣品名稱"] == selected_product)] if products_l
 valid_specs_series = prod_df["取樣點/規格"].dropna() if "取樣點/規格" in prod_df.columns else pd.Series(dtype=str)
 raw_specs_list = sorted([str(s).strip() for s in valid_specs_series.unique() if str(s).strip() and str(s).strip().lower() not in ["nan", "none", "nat", ""]], key=natural_sort_key)
 
+# 預選邏輯：一般課別或單一取樣點預設全選；豁免多規格課別預設選第 1 項
 if "current_spec" not in st.session_state or st.session_state["current_spec"] == "__AUTO_SELECT__":
     if len(raw_specs_list) == 0:
         st.session_state["current_spec"] = []
@@ -514,7 +534,7 @@ with cols_param[1]:
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== 5. 檢驗日期區間選擇與「恢復預設」按鈕 ====================
+# ==================== 5. 檢驗日期區間 / 檢驗年份多選 ====================
 today = date.today()
 default_start = date(today.year - 1, 1, 1) if today.month <= 6 else date(today.year, 1, 1)
 default_end = today
@@ -531,10 +551,18 @@ if st.session_state["user_start_date"] > st.session_state["user_end_date"]:
 is_forced_batch_mode = (
     (selected_unit == "凡立水課" and selected_stage_label in ["製程IPQC", "成品FQC", "出貨OQC"]) or
     (selected_unit == "雙氧水課" and selected_stage_label == "成品FQC") or
-    (selected_unit == "矽碳課-矽膠" and selected_stage_label == "出貨OQC")
+    (selected_unit == "矽碳課-矽膠" and selected_stage_label == "出貨OQC") or
+    (selected_unit == "精密化學課" and selected_stage_label == "出貨OQC")
+)
+
+available_years = (
+    sorted(final_df["_year"].dropna().astype(str).str.strip().unique().tolist(), key=natural_sort_key)
+    if len(final_df) > 0 and "_year" in final_df.columns
+    else []
 )
 
 has_valid_dates = not is_forced_batch_mode and "檢驗日期" in final_df.columns and final_df["_dt"].notna().any()
+show_year_selector = is_forced_batch_mode and len(available_years) > 0
 
 if has_valid_dates:
     cols_val5 = st.columns([0.7, 0.25, 1.3, 0.45, 1.3, 0.9, 3.2])
@@ -556,6 +584,28 @@ if has_valid_dates:
             st.session_state["user_end_date"] = default_end
             st.session_state["date_reset_version"] += 1
             st.rerun()
+elif show_year_selector:
+    if "current_years" not in st.session_state or st.session_state["current_years"] == "__AUTO_SELECT_YEARS__":
+        st.session_state["current_years"] = available_years.copy()
+    elif not isinstance(st.session_state["current_years"], list):
+        st.session_state["current_years"] = available_years.copy()
+    else:
+        st.session_state["current_years"] = [y for y in st.session_state["current_years"] if y in available_years]
+
+    cols_val5 = st.columns([0.95, 3.0, 6.45])
+    with cols_val5[0]:
+        st.markdown('<div class="row-label">檢驗年份</div>', unsafe_allow_html=True)
+    with cols_val5[1]:
+        selected_years = st.multiselect(
+            "檢驗年份",
+            options=available_years,
+            key="current_years",
+            placeholder="請選擇年份（可多選）...",
+            label_visibility="collapsed"
+        )
+        selected_years = [y for y in available_years if y in selected_years]
+else:
+    selected_years = []
 
 filtered_df = final_df.copy()
 if has_valid_dates and len(filtered_df) > 0:
@@ -564,6 +614,12 @@ if has_valid_dates and len(filtered_df) > 0:
         filtered_df = filtered_df[date_mask | filtered_df["_dt"].isna()]
     except Exception:
         pass
+elif show_year_selector and len(filtered_df) > 0:
+    if len(selected_years) > 0:
+        year_mask = filtered_df["_year"].astype(str).str.strip().isin(selected_years)
+        filtered_df = filtered_df[year_mask | filtered_df["_year"].isna()]
+    else:
+        filtered_df = filtered_df.iloc[0:0]
 
 st.markdown("<hr style='margin: 12px 0; border-color: #cbd5e1;'>", unsafe_allow_html=True)
 
@@ -645,6 +701,8 @@ def check_spec_limits_consistency(df_to_check, unit, stage_label, is_multi_exemp
 # ==================== 數據小數點位數讀取與圖表渲染 ====================
 if len(raw_specs_list) > 0 and len(selected_specs) == 0:
     st.warning("尚未選擇項目")
+elif show_year_selector and len(selected_years) == 0:
+    st.warning("尚未選擇檢驗年份")
 elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     clean_data = filtered_df.dropna(subset=["測定值"]).copy()
     decimal_places = 2
@@ -680,9 +738,21 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     else:
         if active_batch_col is not None:
             clean_data[active_batch_col] = clean_data[active_batch_col].astype(str).str.strip()
-            unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
-            clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
-            clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
+            if "_year" in clean_data.columns and clean_data["_year"].notna().any():
+                def batch_with_year_sort_key(row):
+                    y_str = str(row["_year"]).strip() if pd.notna(row["_year"]) else ""
+                    y_num = int(y_str) if re.fullmatch(r"\d{4}", y_str) else 9999
+                    b_key = batch_sort_key(row[active_batch_col])
+                    return (y_num, b_key[0], b_key[1], b_key[2])
+
+                clean_data["_sort_tuple"] = clean_data.apply(batch_with_year_sort_key, axis=1)
+                clean_data = clean_data.sort_values(by="_sort_tuple").reset_index(drop=True)
+                unique_batches = clean_data[active_batch_col].dropna().unique().tolist()
+                clean_data = clean_data.drop(columns=["_sort_tuple"])
+            else:
+                unique_batches = sorted(clean_data[active_batch_col].dropna().unique().tolist(), key=batch_sort_key)
+                clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
+                clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
             xaxis_title_text = active_batch_col
         else:
             clean_data = clean_data.reset_index(drop=True)
@@ -758,7 +828,12 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         return "Normal"
 
     clean_data["異常狀況"] = values.apply(check_anomaly)
-    date_str_range = f"{st.session_state['user_start_date'].strftime('%Y/%m/%d')}-{st.session_state['user_end_date'].strftime('%Y/%m/%d')}" if use_date_axis else "全批號區間"
+    if use_date_axis:
+        date_str_range = f"{st.session_state['user_start_date'].strftime('%Y/%m/%d')}-{st.session_state['user_end_date'].strftime('%Y/%m/%d')}"
+    elif show_year_selector and selected_years:
+        date_str_range = f"{'、'.join(selected_years)}年批號"
+    else:
+        date_str_range = "全批號區間"
 
     MAX_DISPLAY_SPECS = 8
     if not active_specs:
@@ -780,7 +855,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     if missing_specs:
         missing_display_str = " / ".join(missing_specs) if len(missing_specs) <= MAX_DISPLAY_SPECS else f"{' / '.join(missing_specs[:MAX_DISPLAY_SPECS])}...等共 {len(missing_specs)} 項"
         st.markdown(
-            f'<div class="missing-spec-hint">ℹ️ 提示：所選的「<span style="color: #b91c1c; font-weight: 600;">{missing_display_str}</span>」於目前日期區間 ({date_str_range}) 內無檢驗數據，已自動自標題與圖表中略過。</div>',
+            f'<div class="missing-spec-hint">ℹ️ 提示：所選的「<span style="color: #b91c1c; font-weight: 600;">{missing_display_str}</span>」於目前篩選條件 ({date_str_range}) 內無檢驗數據，已自動自標題與圖表中略過。</div>',
             unsafe_allow_html=True
         )
     else:
