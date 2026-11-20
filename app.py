@@ -772,3 +772,392 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         active_specs = [s for s in selected_specs if str(s).strip() in present_specs_set]
         missing_specs = [s for s in selected_specs if str(s).strip() not in present_specs_set]
     else:
+        active_specs = selected_specs.copy()
+        missing_specs = []
+
+    values = clean_data["測定值"]
+    mean_val = values.mean()
+    std_val = values.std(ddof=1) if len(values) > 1 else 0.0
+    n = len(values)
+
+    full_valid_df = final_df.dropna(subset=["測定值"]).copy() if "測定值" in final_df.columns else pd.DataFrame()
+    if selected_specs and "取樣點/規格" in full_valid_df.columns:
+        full_present_specs = set(full_valid_df["取樣點/規格"].dropna().astype(str).str.strip().unique())
+        full_active_specs = [s for s in selected_specs if str(s).strip() in full_present_specs]
+    else:
+        full_active_specs = selected_specs.copy()
+
+    is_multi_spec_special = is_multi_limit_exempt_unit_stage and len(active_specs) > 1
+    is_multi_spec_exempt_full = is_multi_limit_exempt_unit_stage and len(full_active_specs) > 1
+
+    limit_conflicts, conflicting_cols = check_spec_limits_consistency(full_valid_df, selected_unit, selected_stage_label, is_multi_spec_exempt_full)
+    has_limit_conflict = len(conflicting_cols) > 0
+
+    hide_all_limits_flag = is_multi_spec_special or has_limit_conflict
+
+    if hide_all_limits_flag:
+        usl, lsl, ucl, lcl = None, None, None, None
+        cpk = None
+    else:
+        usl = float(clean_data["USL"].dropna().iloc[0]) if "USL" in clean_data.columns and len(clean_data["USL"].dropna()) > 0 else None
+        lsl = float(clean_data["LSL"].dropna().iloc[0]) if "LSL" in clean_data.columns and len(clean_data["LSL"].dropna()) > 0 else None
+        ucl = float(clean_data["UCL"].dropna().iloc[0]) if "UCL" in clean_data.columns and len(clean_data["UCL"].dropna()) > 0 else None
+        lcl = float(clean_data["LCL"].dropna().iloc[0]) if "LCL" in clean_data.columns and len(clean_data["LCL"].dropna()) > 0 else None
+
+        if std_val > 0 and (usl is not None or lsl is not None):
+            cpu = (usl - mean_val) / (3 * std_val) if usl is not None else None
+            cpl = (mean_val - lsl) / (3 * std_val) if lsl is not None else None
+            if cpu is not None and cpl is not None:
+                cpk = min(cpu, cpl)
+            elif cpu is not None:
+                cpk = cpu
+            else:
+                cpk = cpl
+        else:
+            cpk = None
+
+    def check_anomaly(val):
+        if hide_all_limits_flag:
+            return "Normal"
+        if (usl is not None and val > usl) or (lsl is not None and val < lsl):
+            return "超出規格範圍"
+        if (ucl is not None and val > ucl) or (lcl is not None and val < lcl):
+            return "超出管制範圍"
+        return "Normal"
+
+    clean_data["異常狀況"] = values.apply(check_anomaly)
+    if use_date_axis:
+        date_str_range = f"{st.session_state['user_start_date'].strftime('%Y/%m/%d')}-{st.session_state['user_end_date'].strftime('%Y/%m/%d')}"
+    elif show_year_selector and selected_years:
+        date_str_range = f"{'、'.join(selected_years)}年批號"
+    else:
+        date_str_range = "全批號區間"
+
+    MAX_DISPLAY_SPECS = 8
+    if not active_specs:
+        spec_display_short = ""
+    else:
+        if len(active_specs) <= MAX_DISPLAY_SPECS:
+            spec_display_short = f" ➔ <span style='color: #dc2626;'>{' / '.join(active_specs)}</span>"
+        else:
+            shown_str = " / ".join(active_specs[:MAX_DISPLAY_SPECS])
+            spec_display_short = f" ➔ <span style='color: #dc2626;'>{shown_str}...等共 {len(active_specs)} 項</span>"
+
+    summary_title_html = f"""
+    <div class="highlight-title-box">
+        {selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 統計摘要
+    </div>
+    """
+    st.markdown(summary_title_html, unsafe_allow_html=True)
+
+    if missing_specs:
+        missing_display_str = " / ".join(missing_specs) if len(missing_specs) <= MAX_DISPLAY_SPECS else f"{' / '.join(missing_specs[:MAX_DISPLAY_SPECS])}...等共 {len(missing_specs)} 項"
+        st.markdown(
+            f'<div class="missing-spec-hint">ℹ️ 提示：所選的「<span style="color: #b91c1c; font-weight: 600;">{missing_display_str}</span>」於目前篩選條件 ({date_str_range}) 內無檢驗數據，已自動自標題與圖表中略過。</div>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown("<div style='margin: 4px 0;'></div>", unsafe_allow_html=True)
+
+    if has_limit_conflict:
+        conflict_html = (
+            f'<div class="limit-conflict-alert">'
+            f'<b>🚨 全歷史區間規格/管制界限不一致警告（已強制將 USL / LSL / UCL / LCL 與 Cpk 全數鎖定設為 N/A）：</b><br>'
+            f'偵測到「{selected_unit} - {selected_product} ({selected_param})」於全歷史資料中不同取樣點/規格下的界限設定未 100% 相同。請先修正 Google 試算表源頭資料並點擊上方「🔄 更新資料」：<br>'
+            + "<br>".join(limit_conflicts)
+            + '</div>'
+        )
+        st.markdown(conflict_html, unsafe_allow_html=True)
+    
+    def render_custom_metric(label, value, bg_color, border_color, label_color, unique_key):
+        st.markdown(f"""
+            <div key="{unique_key}" style="
+                background-color: {bg_color};
+                border: 1.5px solid {border_color};
+                padding: 4px 8px;
+                border-radius: 6px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                height: 52px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            ">
+                <div style="color: {label_color}; font-size: 10px; font-weight: 600; line-height: 1.2;">{label}</div>
+                <div style="color: #000000; font-size: 14px; font-weight: 700; line-height: 1.3;">{value}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    m1, m2, m3, m4, m5, m6, m7, m8 = st.columns(8)
+    with m1:
+        render_custom_metric("有效樣本數 (n)", f"{n:,}", "#ffffff", "#cbd5e1", "#000000", "m1")
+    with m2:
+        render_custom_metric("平均值 (Mean)", fmt_str.format(mean_val), "#f0fdf4", "#10b981", "#047857", "m2")
+    with m3:
+        render_custom_metric("標準差 (Std)", fmt_str.format(std_val) if std_val > 0 else ("0." + "0" * decimal_places), "#ffffff", "#cbd5e1", "#000000", "m3")
+    with m4:
+        render_custom_metric("製程能力 Cpk", f"{cpk:.3f}" if cpk is not None else "N/A", "#ffffff", "#cbd5e1", "#000000", "m4")
+    with m5:
+        render_custom_metric("管制下限 (LCL)", fmt_str.format(lcl) if lcl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m5")
+    with m6:
+        render_custom_metric("管制上限 (UCL)", fmt_str.format(ucl) if ucl is not None else "N/A", "#fff7ed", "#f97316", "#c2410c", "m6")
+    with m7:
+        render_custom_metric("規格下限 (LSL)", fmt_str.format(lsl) if lsl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m7")
+    with m8:
+        render_custom_metric("規格上限 (USL)", fmt_str.format(usl) if usl is not None else "N/A", "#fef2f2", "#ef4444", "#b91c1c", "m8")
+    
+    st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
+
+    single_line_title = f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short} ➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 管制圖</b>"
+    plain_title_len = len(re.sub(r'<[^>]+>', '', single_line_title))
+
+    if plain_title_len > 85 or len(active_specs) >= 5:
+        line1_plain_len = len(re.sub(r'<[^>]+>', '', f"{selected_unit} ➔ {selected_stage_label} ➔ {selected_product}{spec_display_short}"))
+        plotly_chart_title_text = (
+            f"<b>{selected_unit} ➔ {selected_stage_label} ➔ <span style='color: #dc2626;'>{selected_product}</span>{spec_display_short}</b>"
+            f"<br><b>➔ <span style='color: #dc2626;'>{selected_param}</span> ➔ {date_str_range} 管制圖</b>"
+        )
+        dynamic_margin_t = 96
+        if line1_plain_len > 105:
+            dynamic_title_font_size = 13.5
+        elif line1_plain_len > 85:
+            dynamic_title_font_size = 14.5
+        else:
+            dynamic_title_font_size = 16
+    else:
+        plotly_chart_title_text = single_line_title
+        dynamic_margin_t = 68
+        if plain_title_len > 75:
+            dynamic_title_font_size = 14.5
+        else:
+            dynamic_title_font_size = 16
+
+    def build_trace_points(target_df, base_color):
+        px, py, mc, ms, msz, cdata = [], [], [], [], [], []
+        if use_date_axis:
+            target_df = target_df.sort_values(by="_dt", ascending=True)
+            for i in range(len(target_df)):
+                curr_dt = target_df["_dt"].iloc[i]
+                curr_val = target_df["測定值"].iloc[i]
+                if pd.isna(curr_dt) or pd.isna(curr_val):
+                    continue
+                if i > 0:
+                    prev_dt = target_df["_dt"].iloc[i - 1]
+                    if pd.notna(prev_dt) and (curr_dt - prev_dt).days > 1:
+                        px.append(prev_dt + timedelta(days=1))
+                        py.append(None)
+                        mc.append('#00000000')
+                        ms.append('circle')
+                        msz.append(0)
+                        cdata.append("")
+                is_spec = not hide_all_limits_flag and ((usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl))
+                is_ctrl = not hide_all_limits_flag and ((ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl))
+                if is_spec:
+                    m_col, m_sym, m_s = '#dc2626', 'x', 10
+                elif is_ctrl:
+                    m_col, m_sym, m_s = '#f97316', 'circle', 8
+                else:
+                    m_col, m_sym, m_s = base_color, 'circle', 6
+                px.append(curr_dt)
+                py.append(curr_val)
+                mc.append(m_col)
+                ms.append(m_sym)
+                msz.append(m_s)
+                f_val = f"{curr_val:{plotly_fmt}}"
+                cdata.append(f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val))
+        else:
+            px = target_df[active_batch_col].astype(str).tolist() if active_batch_col is not None else target_df.index.astype(str).tolist()
+            for curr_val in target_df["測定值"].tolist():
+                if pd.isna(curr_val):
+                    py.append(None)
+                    mc.append('#00000000')
+                    ms.append('circle')
+                    msz.append(0)
+                    cdata.append("")
+                    continue
+                is_spec = not hide_all_limits_flag and ((usl is not None and curr_val > usl) or (lsl is not None and curr_val < lsl))
+                is_ctrl = not hide_all_limits_flag and ((ucl is not None and curr_val > ucl) or (lcl is not None and curr_val < lcl))
+                if is_spec:
+                    m_col, m_sym, m_s = '#dc2626', 'x', 10
+                elif is_ctrl:
+                    m_col, m_sym, m_s = '#f97316', 'circle', 8
+                else:
+                    m_col, m_sym, m_s = base_color, 'circle', 6
+                py.append(curr_val)
+                mc.append(m_col)
+                ms.append(m_sym)
+                msz.append(m_s)
+                f_val = f"{curr_val:{plotly_fmt}}"
+                cdata.append(f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val))
+        return px, py, mc, ms, msz, cdata
+
+    fig = go.Figure()
+    
+    if len(active_specs) > 1 and "取樣點/規格" in clean_data.columns:
+        color_palette = ['#111827', '#0066ff', '#059669', '#d97706', '#9333ea', '#e11d48', '#0284c7', '#10b981', '#7c3aed', '#ca8a04']
+        for idx, sub_spec in enumerate(active_specs):
+            sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
+            if len(sub_df) == 0:
+                continue
+            sub_color = color_palette[idx % len(color_palette)]
+            plot_x, plot_y, m_colors, m_symbols, m_sizes, custom_data = build_trace_points(sub_df, sub_color)
+            fig.add_trace(go.Scatter(
+                x=plot_x, y=plot_y, mode='lines+markers', name=f"{sub_spec}",
+                hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
+                customdata=custom_data, line=dict(color=sub_color, width=2.5),
+                marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols), connectgaps=False
+            ))
+    else:
+        plot_x, plot_y, m_colors, m_symbols, m_sizes, custom_data = build_trace_points(clean_data, '#0066ff')
+        single_trace_name = active_specs[0] if len(active_specs) == 1 else selected_param
+        fig.add_trace(go.Scatter(
+            x=plot_x, y=plot_y, mode='lines+markers', name=single_trace_name,
+            hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
+            customdata=custom_data, line=dict(color='#0066ff', width=2),
+            marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols), connectgaps=False
+        ))
+    
+    if not hide_all_limits_flag:
+        fig.add_hline(
+            y=mean_val, line_dash="solid", line_color="#10b981",
+            annotation_text=f"CL: {fmt_str.format(mean_val)}",
+            annotation_font_color="#10b981", annotation_position="bottom right"
+        )
+        if ucl is not None:
+            fig.add_hline(y=ucl, line_dash="dot", line_color="#f97316", annotation_text=f"UCL: {fmt_str.format(ucl)}", annotation_font_color="#f97316", annotation_position="top left")
+        if lcl is not None:
+            fig.add_hline(y=lcl, line_dash="dot", line_color="#f97316", annotation_text=f"LCL: {fmt_str.format(lcl)}", annotation_font_color="#f97316", annotation_position="bottom left")
+        if usl is not None:
+            fig.add_hline(y=usl, line_dash="dash", line_color="#ef4444", annotation_text=f"USL: {fmt_str.format(usl)}", annotation_font_color="#ef4444", annotation_position="top right")
+        if lsl is not None:
+            fig.add_hline(y=lsl, line_dash="dash", line_color="#ef4444", annotation_text=f"LSL: {fmt_str.format(lsl)}", annotation_font_color="#ef4444", annotation_position="bottom right")
+
+    fig.update_layout(
+        title=dict(text="", font=dict(color="#000000", size=1)),
+        xaxis_title=dict(text=xaxis_title_text, font=dict(color="#000000", size=12)),
+        yaxis_title=dict(text=selected_param, font=dict(color="#000000", size=12)),
+        plot_bgcolor="#ffffff", paper_bgcolor="#ffffff",
+        font=dict(color="#000000", family="sans-serif"),
+        hovermode="x unified",
+        hoverdistance=1,
+        hoverlabel=dict(align="left", namelength=0),
+        margin=dict(l=60, r=40, t=dynamic_margin_t, b=80),
+        legend=dict(y=0.5, yanchor="middle", bordercolor="#000000", borderwidth=1),
+        xaxis=dict(
+            type='date' if use_date_axis else 'category',
+            categoryorder='array' if not use_date_axis else None,
+            categoryarray=unique_batches if not use_date_axis else None,
+            tickformat='%Y-%m-%d' if use_date_axis else None,
+            tickfont=dict(color="#000000", size=10), title_font=dict(color="#000000"),
+            tickangle=-45, nticks=30, showline=True, linewidth=1, linecolor='black', mirror=True,
+            showspikes=True, spikemode="across", spikesnap="cursor", spikethickness=1, spikecolor="black", spikedash="dash"
+        ),
+        yaxis=dict(
+            tickfont=dict(color="#000000"), title_font=dict(color="#000000"),
+            title=dict(text=selected_param, font=dict(color="#000000", size=12)),
+            tickformat=plotly_fmt, showline=True, linewidth=1, linecolor='black', mirror=True,
+            showspikes=True, spikemode="across", spikesnap="cursor", spikethickness=1, spikecolor="black", spikedash="dash"
+        )
+    )
+
+    fig.add_annotation(
+        text=plotly_chart_title_text,
+        xref="paper", yref="paper",
+        x=0, y=1.05, yshift=2,
+        xanchor="left", yanchor="bottom", align="left",
+        showarrow=False,
+        font=dict(size=dynamic_title_font_size, color="#713f12", family="sans-serif"),
+        bgcolor="#fef08a", bordercolor="#fde047", borderwidth=1, borderpad=7
+    )
+
+    MAX_FILENAME_SPECS = 3
+    if not active_specs:
+        safe_spec_str = ""
+    elif len(active_specs) <= MAX_FILENAME_SPECS:
+        safe_spec_str = "_".join(active_specs)
+    else:
+        safe_spec_str = f"{'_'.join(active_specs[:MAX_FILENAME_SPECS])}_等{len(active_specs)}項"
+
+    raw_filename = f"SPC_{selected_unit}_{selected_stage_label}_{selected_product}_{safe_spec_str}_{selected_param}_{date_str_range}"
+    safe_filename = re.sub(r'[\\/*?:"<>|]', "_", raw_filename)
+    safe_filename = re.sub(r'_+', "_", safe_filename).strip("_")
+
+    plotly_config = {
+        "toImageButtonOptions": {
+            "format": "png",
+            "filename": safe_filename,
+            "height": 640 if dynamic_margin_t > 70 else 600,
+            "width": 1800,
+            "scale": 2
+        }
+    }
+
+    st.plotly_chart(fig, use_container_width=True, key="spc_main_chart", config=plotly_config)
+
+    abnormal_df = clean_data[clean_data["異常狀況"] != "Normal"].copy()
+    
+    if has_limit_conflict:
+        st.error("🚨 因全歷史區間內規格或管制界限設定不一致，異常點判定與界限線已全數暫停隱藏。請先依上方紅框提示修正 Google 試算表源頭資料。")
+    elif len(abnormal_df) > 0:
+        spec_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出規格範圍"])
+        control_count = len(abnormal_df[abnormal_df["異常狀況"] == "超出管制範圍"])
+        total_count = len(clean_data)
+        spec_pct = (spec_count / total_count * 100) if total_count > 0 else 0.0
+        control_pct = (control_count / total_count * 100) if total_count > 0 else 0.0
+        
+        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 <span style="color: #000000;">(總樣本數：{total_count:,} 筆 ｜ 超出規格範圍：{spec_count} 筆 [{spec_pct:.2f}%] ｜ 超出管制範圍：{control_count} 筆 [{control_pct:.2f}%])</span></div>', unsafe_allow_html=True)
+        
+        has_spec_in_abnormal = "取樣點/規格" in abnormal_df.columns and abnormal_df["取樣點/規格"].dropna().astype(str).str.strip().ne("").any()
+        
+        col_name_mapping = {
+            "異常狀況": "異常狀況",
+            "取樣點/規格": spec_label_text,
+            active_batch_col: active_batch_col,
+            "檢驗日期": "檢驗日期",
+            "測定值": "測定值",
+            "USL": "規格上限 (USL)",
+            "LSL": "規格下限 (LSL)",
+            "UCL": "管制上限 (UCL)",
+            "LCL": "管制下限 (LCL)"
+        }
+        
+        candidate_cols = ["異常狀況"]
+        if has_spec_in_abnormal:
+            candidate_cols.append("取樣點/規格")
+        candidate_cols.extend([active_batch_col, "檢驗日期", "測定值", "USL", "LSL", "UCL", "LCL"])
+        
+        display_cols = [c for c in candidate_cols if c is not None and (c in abnormal_df.columns or c == "異常狀況")]
+        
+        table_html = '<table class="custom-alert-table"><thead><tr>'
+        for col in display_cols:
+            table_html += f'<th>{col_name_mapping.get(col, col)}</th>'
+        table_html += '</tr></thead><tbody>'
+        
+        for _, row in abnormal_df[display_cols].iterrows():
+            table_html += '<tr>'
+            for col in display_cols:
+                val = row[col]
+                if pd.isna(val):
+                    val_str = ""
+                elif col == "異常狀況":
+                    val_str = "❌ 超出規格範圍" if "規格" in str(val) else "⚠️ 超出管制範圍"
+                elif isinstance(val, float):
+                    val_str = f"{val:.{decimal_places}f}"
+                else:
+                    val_str = str(val)
+                safe_title = val_str.replace('"', '&quot;')
+                table_html += f'<td title="{safe_title}">{val_str}</td>'
+            table_html += '</tr>'
+        table_html += '</tbody></table>'
+        st.markdown(table_html, unsafe_allow_html=True)
+    else:
+        st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
+
+    with st.expander("點此查看該項目的完整歷史數據明細"):
+        st.dataframe(clean_data.drop(columns=["_dt", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
+        
+elif len(raw_specs_list) > 0 or len(selected_specs) > 0:
+    if has_valid_dates:
+        locked_range_str = f"{st.session_state['user_start_date'].strftime('%Y/%m/%d')} - {st.session_state['user_end_date'].strftime('%Y/%m/%d')}"
+        st.warning(f"⚠️ 該篩選條件於目前鎖定的日期區間（{locked_range_str}）內沒有對應的檢驗數據，請調整上方檢驗日期或點擊「恢復預設」。")
+    else:
+        st.warning("⚠️ 該篩選條件下沒有對應的檢驗數據。")
