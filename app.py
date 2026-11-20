@@ -312,7 +312,6 @@ def get_default_years(avail_years, ref_date):
     """
     每年第 1~3 個月：預設選擇前一年 + 當年
     每年第 4 個月起：預設只選擇當年
-    （若目標年份不在可用年份內且可用年份非空，則退選最新一年避免空畫面）
     """
     if not avail_years:
         return []
@@ -323,6 +322,33 @@ def get_default_years(avail_years, ref_date):
     if matched:
         return matched
     return [avail_years[-1]]
+
+def format_selected_years(years_list):
+    """
+    連續年份（如 2025, 2026）顯示為 2025-2026
+    不連續年份（如 2024, 2026）顯示為 2024、2026
+    """
+    if not years_list:
+        return ""
+    cleaned = sorted({str(y).strip() for y in years_list if str(y).strip()})
+    int_years = sorted({int(y) for y in cleaned if re.fullmatch(r"\d{4}", y)})
+    non_int_years = [y for y in cleaned if not re.fullmatch(r"\d{4}", y)]
+
+    parts = []
+    if int_years:
+        start_y = int_years[0]
+        prev_y = int_years[0]
+        for y in int_years[1:]:
+            if y == prev_y + 1:
+                prev_y = y
+            else:
+                parts.append(f"{start_y}-{prev_y}" if start_y != prev_y else f"{start_y}")
+                start_y = y
+                prev_y = y
+        parts.append(f"{start_y}-{prev_y}" if start_y != prev_y else f"{start_y}")
+
+    parts.extend(non_int_years)
+    return "、".join(parts)
 
 # ==================== 狀態回呼與瞬間聯動邏輯 ====================
 def on_unit_change():
@@ -606,6 +632,16 @@ elif show_year_selector:
     else:
         st.session_state["current_years"] = [y for y in st.session_state["current_years"] if y in available_years]
 
+    if st.session_state.get("trigger_year_action") == "select_all_years":
+        st.session_state["current_years"] = available_years.copy()
+        st.session_state.pop("trigger_year_action", None)
+    elif st.session_state.get("trigger_year_action") == "deselect_all_years":
+        st.session_state["current_years"] = []
+        st.session_state.pop("trigger_year_action", None)
+
+    is_all_years_selected = len(available_years) > 0 and set(st.session_state["current_years"]) == set(available_years)
+    is_none_years_selected = len(st.session_state["current_years"]) == 0
+
     cols_val5 = st.columns(master_grid_weights)
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗年份</div>', unsafe_allow_html=True)
@@ -618,6 +654,16 @@ elif show_year_selector:
             label_visibility="collapsed"
         )
         selected_years = [y for y in available_years if y in selected_years]
+    with cols_val5[4]:
+        y_cols = st.columns(2)
+        with y_cols[0]:
+            if st.button("全選", key="btn_year_select_all", use_container_width=True, disabled=is_all_years_selected):
+                st.session_state["trigger_year_action"] = "select_all_years"
+                st.rerun()
+        with y_cols[1]:
+            if st.button("全部取消", key="btn_year_deselect_all", use_container_width=True, disabled=is_none_years_selected):
+                st.session_state["trigger_year_action"] = "deselect_all_years"
+                st.rerun()
 else:
     selected_years = []
 
@@ -845,7 +891,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     if use_date_axis:
         date_str_range = f"{st.session_state['user_start_date'].strftime('%Y/%m/%d')}-{st.session_state['user_end_date'].strftime('%Y/%m/%d')}"
     elif show_year_selector and selected_years:
-        date_str_range = f"{'、'.join(selected_years)}年批號"
+        date_str_range = f"{format_selected_years(selected_years)}年批號"
     else:
         date_str_range = "全批號區間"
 
