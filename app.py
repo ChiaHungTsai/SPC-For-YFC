@@ -642,7 +642,8 @@ elif show_year_selector:
     is_all_years_selected = len(available_years) > 0 and set(st.session_state["current_years"]) == set(available_years)
     is_none_years_selected = len(st.session_state["current_years"]) == 0
 
-    cols_val5 = st.columns([0.95, 3.0, 2.4, 7.8])
+    # 總權重 0.95 + 3.0 + 2.4 + 6.4 = 12.75，與第 3、4 列的 master_grid_weights 總權重完全對齊
+    cols_val5 = st.columns([0.95, 3.0, 2.4, 6.4])
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗年份</div>', unsafe_allow_html=True)
     with cols_val5[1]:
