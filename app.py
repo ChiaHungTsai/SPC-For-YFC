@@ -590,7 +590,7 @@ elif show_year_selector:
     else:
         st.session_state["current_years"] = [y for y in st.session_state["current_years"] if y in available_years]
 
-    cols_val5 = st.columns([0.7, 3.6, 6.1])
+    cols_val5 = st.columns([0.95, 3.6, 5.85])
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗年份</div>', unsafe_allow_html=True)
     with cols_val5[1]:
