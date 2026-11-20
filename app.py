@@ -308,6 +308,22 @@ def batch_sort_key(s):
 def natural_sort_key(s):
     return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', str(s))]
 
+def get_default_years(avail_years, ref_date):
+    """
+    每年第 1~3 個月：預設選擇前一年 + 當年
+    每年第 4 個月起：預設只選擇當年
+    （若目標年份不在可用年份內且可用年份非空，則退選最新一年避免空畫面）
+    """
+    if not avail_years:
+        return []
+    curr_y_str = str(ref_date.year)
+    prev_y_str = str(ref_date.year - 1)
+    desired_years = [prev_y_str, curr_y_str] if ref_date.month <= 3 else [curr_y_str]
+    matched = [y for y in avail_years if y in desired_years]
+    if matched:
+        return matched
+    return [avail_years[-1]]
+
 # ==================== 狀態回呼與瞬間聯動邏輯 ====================
 def on_unit_change():
     st.session_state.pop("selected_stage", None)
@@ -584,9 +600,9 @@ if has_valid_dates:
             st.rerun()
 elif show_year_selector:
     if "current_years" not in st.session_state or st.session_state["current_years"] == "__AUTO_SELECT_YEARS__":
-        st.session_state["current_years"] = available_years.copy()
+        st.session_state["current_years"] = get_default_years(available_years, today)
     elif not isinstance(st.session_state["current_years"], list):
-        st.session_state["current_years"] = available_years.copy()
+        st.session_state["current_years"] = get_default_years(available_years, today)
     else:
         st.session_state["current_years"] = [y for y in st.session_state["current_years"] if y in available_years]
 
@@ -712,6 +728,7 @@ elif show_year_selector and len(selected_years) == 0:
     st.warning("尚未選擇檢驗年份")
 elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
     clean_data = filtered_df.dropna(subset=["測定值"]).copy()
+    decimal_places = 2
     has_custom_dec = False
     if "小數位數" in clean_data.columns:
         valid_dec_series = clean_data["小數位數"].dropna()
