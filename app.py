@@ -428,12 +428,18 @@ for i, unit in enumerate(fixed_units_list):
 st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
 # ==================== 2. 製程階段按鈕群組 ====================
-stages_dict = {"原料IQC": "原料", "製程IPQC": "製程", "成品FQC": "成品", "出貨OQC": "出貨"}
+stages_dict = {
+    "原料IQC": "原料",
+    "製程IPQC": "製程",
+    "成品FQC": "成品",
+    "出貨OQC": "出貨",
+    "其他/副產物": "其他"
+}
 stages_list = list(stages_dict.keys())
 
 if "selected_stage" not in st.session_state or st.session_state["selected_stage"] not in stages_list:
     target_stage = None
-    for p_stage in ["出貨OQC", "成品FQC", "製程IPQC", "原料IQC"]:
+    for p_stage in ["出貨OQC", "成品FQC", "製程IPQC", "原料IQC", "其他/副產物"]:
         raw_val = stages_dict[p_stage]
         if "階段" in unit_df.columns and any(unit_df["階段"].str.contains(raw_val, na=False) | (unit_df["階段"] == p_stage)):
             target_stage = p_stage
@@ -454,7 +460,7 @@ with cols_stage[0]:
     st.markdown('<div class="row-label">製程階段</div>', unsafe_allow_html=True)
 
 for i, (stage_label, raw_name) in enumerate(stages_dict.items()):
-    has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
+    has_stage_data = any(unit_df["階段"].str.contains(raw_name, na=False) | (unit_df["階段"] == stage_label)) if len(unit_df) > 0 and "階段" in unit_df.columns else False
     with cols_stage[i + 1]:
         if has_stage_data:
             is_active = (selected_stage_label == stage_label)
@@ -642,7 +648,6 @@ elif show_year_selector:
     is_all_years_selected = len(available_years) > 0 and set(st.session_state["current_years"]) == set(available_years)
     is_none_years_selected = len(st.session_state["current_years"]) == 0
 
-    # 總權重 0.95 + 3.0 + 2.4 + 6.4 = 12.75，與第 3、4 列的 master_grid_weights 總權重完全對齊
     cols_val5 = st.columns([0.95, 3.0, 2.4, 6.4])
     with cols_val5[0]:
         st.markdown('<div class="row-label">檢驗年份</div>', unsafe_allow_html=True)
