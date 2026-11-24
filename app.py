@@ -1058,10 +1058,28 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 cdata.append(f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val))
         return px, py, mc, ms, msz, cdata
 
+    # 第 1~5 條線固定色碼，第 6 條線起接續高辨識度自訂色票
+    color_palette = [
+        "#0070C0",  # 1
+        "#A8423F",  # 2
+        "#CFA0F6",  # 3
+        "#2AD069",  # 4
+        "#000000",  # 5
+        "#ED7D31",  # 6
+        "#4472C4",  # 7
+        "#FFC000",  # 8
+        "#70AD47",  # 9
+        "#9E480E",  # 10
+        "#255E91",  # 11
+        "#636363",  # 12
+        "#5B9BD5",  # 13
+        "#A5A5A5",  # 14
+        "#264478",  # 15
+    ]
+
     fig = go.Figure()
     
     if len(active_specs) > 1 and "取樣點/規格" in clean_data.columns:
-        color_palette = ['#111827', '#0066ff', '#059669', '#d97706', '#9333ea', '#e11d48', '#0284c7', '#10b981', '#7c3aed', '#ca8a04']
         for idx, sub_spec in enumerate(active_specs):
             sub_df = clean_data[clean_data["取樣點/規格"].astype(str).str.strip() == str(sub_spec)].copy()
             if len(sub_df) == 0:
@@ -1075,12 +1093,13 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols), connectgaps=False
             ))
     else:
-        plot_x, plot_y, m_colors, m_symbols, m_sizes, custom_data = build_trace_points(clean_data, '#0066ff')
+        first_color = color_palette[0]
+        plot_x, plot_y, m_colors, m_symbols, m_sizes, custom_data = build_trace_points(clean_data, first_color)
         single_trace_name = active_specs[0] if len(active_specs) == 1 else selected_param
         fig.add_trace(go.Scatter(
             x=plot_x, y=plot_y, mode='lines+markers', name=single_trace_name,
             hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
-            customdata=custom_data, line=dict(color='#0066ff', width=2),
+            customdata=custom_data, line=dict(color=first_color, width=2.5),
             marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols), connectgaps=False
         ))
     
