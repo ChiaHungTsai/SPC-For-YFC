@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 # 1. 網頁基本設定 (寬螢幕、隱藏側邊欄)
 st.set_page_config(page_title="義芳化學品保科 - SPC 統計製程管制儀表板", layout="wide", initial_sidebar_state="collapsed")
@@ -46,6 +46,11 @@ st.markdown("""
         letter-spacing: 0.5px;
         line-height: 1.2;
     }
+    .sync-meta-bar {
+        font-size: 12px;
+        color: #475569;
+        margin: 2px 0 6px 2px;
+    }
     div[data-baseweb="popover"] {
         width: max-content !important;
         min-width: 280px !important;
@@ -59,33 +64,10 @@ st.markdown("""
         word-break: break-all !important;
         height: auto !important;
     }
-    .custom-alert-table {
-        width: 100%;
-        border-collapse: collapse;
-        background-color: #ffffff;
-        font-size: 14px;
-        color: #1e293b;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        border-radius: 6px;
-        overflow: hidden;
-        margin-bottom: 12px;
-        table-layout: fixed;
+    div[data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+        max-height: 110px !important;
+        overflow-y: auto !important;
     }
-    .custom-alert-table th, .custom-alert-table td {
-        text-align: center !important;
-        padding: 10px 8px;
-        border-bottom: 1px solid #e2e8f0;
-        white-space: nowrap !important;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .custom-alert-table th {
-        background-color: #f1f5f9;
-        color: #334155;
-        font-weight: 700;
-        border-bottom: 2px solid #cbd5e1;
-    }
-    .custom-alert-table tr:hover { background-color: #f8fafc; }
     .row-label {
         font-size: 16px;
         font-weight: 700;
@@ -119,7 +101,7 @@ st.markdown("""
         padding-right: 8px;
         white-space: nowrap;
     }
-    .stButton > button {
+    .stButton > button, .stDownloadButton > button {
         width: 100% !important;
         height: 36px !important;
         padding: 2px 6px !important;
@@ -213,70 +195,72 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Google 試算表遠端 CSV 讀取設定（含斷線備援機制）
+# 3. Google 試算表遠端 CSV 讀取設定（含快取向量化與斷線備援機制）
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSgSWa6LTNxRQYImmAZkHX2JbsNkuROSpb_4Q3u6VJ05k72wsTjQ3eq8TMRtn3JpMEg59jlqYqoTk0_/pub?gid=729038536&single=true&output=csv"
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60, show_spinner=False)
 def fetch_raw_csv(url):
     return pd.read_csv(url, dtype=str)
 
-def load_and_preprocess_data(url):
-    try:
-        temp_df = fetch_raw_csv(url).copy()
-        st.session_state["backup_df"] = temp_df.copy()
-    except Exception as e:
-        if "backup_df" in st.session_state and isinstance(st.session_state["backup_df"], pd.DataFrame) and len(st.session_state["backup_df"]) > 0:
-            st.toast(f"⚠️ 遠端試算表連線瞬斷，暫時沿用先前快取資料：{e}", icon="⚠️")
-            temp_df = st.session_state["backup_df"].copy()
-        else:
-            st.error(f"讀取 Google 試算表失敗，請檢查網路連線或共用權限設定。錯誤訊息: {e}")
-            st.stop()
-        
+@st.cache_data(ttl=60, show_spinner=False)
+def preprocess_cached_df(raw_df):
+    temp_df = raw_df.copy()
     temp_df.columns = [c.strip() for c in temp_df.columns]
-    
+
     prod_col = None
     for candidate in ["樣品名稱", "成品名稱", "產品名稱"]:
         if candidate in temp_df.columns:
             prod_col = candidate
             break
-            
+
     if prod_col and prod_col != "樣品名稱":
         temp_df = temp_df.rename(columns={prod_col: "樣品名稱"})
-        
+
     for col in ["單位", "階段", "樣品名稱", "分析項目", "取樣點/規格", "小數位數", "USL", "LSL", "UCL", "LCL", "檢驗日期"]:
         if col in temp_df.columns:
             temp_df[col] = temp_df[col].astype(str).str.strip()
             temp_df.loc[temp_df[col].isin(["nan", "NaN", "None", "NAT", "nat", ""]), col] = np.nan
-            
+
     if "測定值" in temp_df.columns:
         temp_df["測定值_str"] = temp_df["測定值"].astype(str).str.strip()
         temp_df["測定值"] = pd.to_numeric(temp_df["測定值"], errors='coerce')
-        
+
     for limit_col in ["USL", "LSL", "UCL", "LCL"]:
         if limit_col in temp_df.columns:
             temp_df[limit_col] = pd.to_numeric(temp_df[limit_col], errors='coerce')
-            
+
     if "檢驗日期" in temp_df.columns:
         raw_date_str = temp_df["檢驗日期"].astype(str).str.strip()
         is_pure_year = raw_date_str.str.match(r"^(19|20)\d{2}$", na=False)
         parsed_dt = pd.to_datetime(raw_date_str.where(~is_pure_year, np.nan), format='mixed', errors='coerce')
         temp_df["_dt"] = parsed_dt
 
-        def extract_year_val(row):
-            s_val = str(row["檢驗日期"]).strip() if pd.notna(row["檢驗日期"]) else ""
-            m4 = re.search(r"\b((?:19|20)\d{2})\b", s_val)
-            if m4:
-                return m4.group(1)
-            if pd.notna(row["_dt"]):
-                return str(row["_dt"].year)
-            return np.nan
-
-        temp_df["_year"] = temp_df.apply(extract_year_val, axis=1)
+        extracted_4y = raw_date_str.str.extract(r"\b((?:19|20)\d{2})\b", expand=False)
+        dt_year = parsed_dt.dt.year.astype("Int64").astype(str)
+        dt_year = dt_year.where(parsed_dt.notna(), np.nan)
+        temp_df["_year"] = extracted_4y.fillna(dt_year)
     else:
         temp_df["_dt"] = pd.NaT
         temp_df["_year"] = np.nan
-            
+
     return temp_df
+
+def load_and_preprocess_data(url):
+    try:
+        raw_df = fetch_raw_csv(url).copy()
+        st.session_state["backup_df"] = raw_df.copy()
+        st.session_state["last_sync_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        st.session_state["is_fallback_sync"] = False
+    except Exception as e:
+        if "backup_df" in st.session_state and isinstance(st.session_state["backup_df"], pd.DataFrame) and len(st.session_state["backup_df"]) > 0:
+            st.toast(f"⚠️ 遠端試算表連線瞬斷，暫時沿用先前快取資料：{e}", icon="⚠️")
+            raw_df = st.session_state["backup_df"].copy()
+            st.session_state["is_fallback_sync"] = True
+        else:
+            st.error(f"讀取 Google 試算表失敗，請檢查網路連線或共用權限設定。錯誤訊息: {e}")
+            st.stop()
+
+    return preprocess_cached_df(raw_df).copy()
 
 df = load_and_preprocess_data(GOOGLE_SHEET_CSV_URL)
 
@@ -386,10 +370,18 @@ with header_cols[1]:
     st.markdown('<div class="refresh-btn-fixed">', unsafe_allow_html=True)
     if st.button("🔄 更新資料", use_container_width=False):
         fetch_raw_csv.clear()
+        preprocess_cached_df.clear()
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+sync_label = st.session_state.get("last_sync_time", "-")
+fallback_badge = "（快取備援中）" if st.session_state.get("is_fallback_sync") else ""
+st.markdown(
+    f'<div class="sync-meta-bar">🕒 資料同步時間：{sync_label}{fallback_badge} ｜ 總列數：{len(df):,} 筆</div>',
+    unsafe_allow_html=True
+)
+
+st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # ==================== 網格比例設定 ====================
 master_grid_weights = [0.95, 3.0, 1.4, 3.6, 2.4, 1.4]
@@ -1058,7 +1050,6 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 cdata.append(f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val))
         return px, py, mc, ms, msz, cdata
 
-    # 第 1~5 條線固定色碼，第 6 條線起接續高辨識度自訂色票
     color_palette = [
         "#0070C0",  # 1
         "#A8423F",  # 2
@@ -1190,11 +1181,18 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         total_count = len(clean_data)
         spec_pct = (spec_count / total_count * 100) if total_count > 0 else 0.0
         control_pct = (control_count / total_count * 100) if total_count > 0 else 0.0
-        
-        st.markdown(f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">⚠️ 異常警示清單 <span style="color: #000000;">(總樣本數：{total_count:,} 筆 ｜ 超出規格範圍：{spec_count} 筆 [{spec_pct:.2f}%] ｜ 超出管制範圍：{control_count} 筆 [{control_pct:.2f}%])</span></div>', unsafe_allow_html=True)
-        
+
+        alert_hdr_cols = st.columns([9.6, 1.4])
+        with alert_hdr_cols[0]:
+            st.markdown(
+                f'<div class="highlight-title-box" style="background-color: #fee2e2; border-color: #fca5a5; color: #991b1b;">'
+                f'⚠️ 異常警示清單 <span style="color: #000000;">(總樣本數：{total_count:,} 筆 ｜ 超出規格範圍：{spec_count} 筆 [{spec_pct:.2f}%] ｜ 超出管制範圍：{control_count} 筆 [{control_pct:.2f}%])</span>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
         has_spec_in_abnormal = "取樣點/規格" in abnormal_df.columns and abnormal_df["取樣點/規格"].dropna().astype(str).str.strip().ne("").any()
-        
+
         col_name_mapping = {
             "異常狀況": "異常狀況",
             "取樣點/規格": spec_label_text,
@@ -1206,21 +1204,16 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             "UCL": "管制上限 (UCL)",
             "LCL": "管制下限 (LCL)"
         }
-        
+
         candidate_cols = ["異常狀況"]
         if has_spec_in_abnormal:
             candidate_cols.append("取樣點/規格")
         candidate_cols.extend([active_batch_col, "檢驗日期", "測定值", "USL", "LSL", "UCL", "LCL"])
-        
         display_cols = [c for c in candidate_cols if c is not None and (c in abnormal_df.columns or c == "異常狀況")]
-        
-        table_html = '<table class="custom-alert-table"><thead><tr>'
-        for col in display_cols:
-            table_html += f'<th>{col_name_mapping.get(col, col)}</th>'
-        table_html += '</tr></thead><tbody>'
-        
+
+        alert_rows = []
         for _, row in abnormal_df[display_cols].iterrows():
-            table_html += '<tr>'
+            r_dict = {}
             for col in display_cols:
                 val = row[col]
                 if pd.isna(val):
@@ -1231,11 +1224,23 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                     val_str = f"{val:.{decimal_places}f}"
                 else:
                     val_str = str(val)
-                safe_title = val_str.replace('"', '&quot;')
-                table_html += f'<td title="{safe_title}">{val_str}</td>'
-            table_html += '</tr>'
-        table_html += '</tbody></table>'
-        st.markdown(table_html, unsafe_allow_html=True)
+                r_dict[col_name_mapping.get(col, col)] = val_str
+            alert_rows.append(r_dict)
+
+        alert_display_df = pd.DataFrame(alert_rows)
+        csv_bytes = alert_display_df.to_csv(index=False).encode("utf-8-sig")
+
+        with alert_hdr_cols[1]:
+            st.download_button(
+                label="📥 匯出異常 CSV",
+                data=csv_bytes,
+                file_name=f"{safe_filename}_異常清單.csv",
+                mime="text/csv",
+                key="btn_download_abnormal_csv",
+                use_container_width=True
+            )
+
+        st.dataframe(alert_display_df, use_container_width=True, hide_index=True, key="abnormal_data_table")
     else:
         st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
 
