@@ -266,6 +266,12 @@ def load_and_preprocess_data(url):
 
 df = load_and_preprocess_data(GOOGLE_SHEET_CSV_URL)
 
+latest_data_date_str = (
+    df["_dt"].dropna().max().strftime("%Y-%m-%d")
+    if len(df) > 0 and "_dt" in df.columns and df["_dt"].notna().any()
+    else "無有效日期"
+)
+
 # ==================== 原始標準批號排序函數 ====================
 def batch_sort_key(s):
     s_str = str(s).strip()
@@ -379,7 +385,7 @@ with header_cols[1]:
 sync_label = st.session_state.get("last_sync_time", "-")
 fallback_badge = "（快取備援中）" if st.session_state.get("is_fallback_sync") else ""
 st.markdown(
-    f'<div class="sync-meta-bar">🕒 資料同步時間：{sync_label}{fallback_badge} ｜ 總列數：{len(df):,} 筆</div>',
+    f'<div class="sync-meta-bar">📅 資料最新檢驗日期：{latest_data_date_str} ｜ 🕒 儀表板同步時間：{sync_label}{fallback_badge} ｜ 總列數：{len(df):,} 筆</div>',
     unsafe_allow_html=True
 )
 
