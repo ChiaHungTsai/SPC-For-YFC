@@ -4,7 +4,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+
+TZ_TW = timezone(timedelta(hours=8))
 
 # 1. 網頁基本設定 (寬螢幕、隱藏側邊欄)
 st.set_page_config(page_title="義芳化學品保科 - SPC 統計製程管制儀表板", layout="wide", initial_sidebar_state="collapsed")
@@ -249,7 +251,7 @@ def load_and_preprocess_data(url):
     try:
         raw_df = fetch_raw_csv(url).copy()
         st.session_state["backup_df"] = raw_df.copy()
-        st.session_state["last_sync_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        st.session_state["last_sync_time"] = datetime.now(TZ_TW).strftime("%Y-%m-%d %H:%M:%S")
         st.session_state["is_fallback_sync"] = False
     except Exception as e:
         if "backup_df" in st.session_state and isinstance(st.session_state["backup_df"], pd.DataFrame) and len(st.session_state["backup_df"]) > 0:
@@ -573,7 +575,7 @@ with cols_param[1]:
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
 # ==================== 5. 檢驗日期區間 / 檢驗年份多選 ====================
-today = date.today()
+today = datetime.now(TZ_TW).date()
 default_start = date(today.year - 1, 1, 1) if today.month <= 6 else date(today.year, 1, 1)
 default_end = today
 
