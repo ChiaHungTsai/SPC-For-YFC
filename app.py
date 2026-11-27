@@ -266,11 +266,16 @@ def load_and_preprocess_data(url):
 
 df = load_and_preprocess_data(GOOGLE_SHEET_CSV_URL)
 
-latest_data_date_str = (
-    df["_dt"].dropna().max().strftime("%Y-%m-%d")
-    if len(df) > 0 and "_dt" in df.columns and df["_dt"].notna().any()
-    else "無有效日期"
-)
+def get_latest_inspection_label(target_df):
+    if target_df is None or len(target_df) == 0:
+        return "無有效日期"
+    if "_dt" in target_df.columns and target_df["_dt"].notna().any():
+        return target_df["_dt"].dropna().max().strftime("%Y-%m-%d")
+    if "_year" in target_df.columns and target_df["_year"].notna().any():
+        years_sorted = sorted(target_df["_year"].dropna().astype(str).str.strip().unique().tolist(), key=natural_sort_key)
+        if years_sorted:
+            return f"{years_sorted[-1]}年"
+    return "無有效日期"
 
 # ==================== 原始標準批號排序函數 ====================
 def batch_sort_key(s):
@@ -382,12 +387,7 @@ with header_cols[1]:
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-sync_label = st.session_state.get("last_sync_time", "-")
-fallback_badge = "（快取備援中）" if st.session_state.get("is_fallback_sync") else ""
-st.markdown(
-    f'<div class="sync-meta-bar">📅 資料最新檢驗日期：{latest_data_date_str} ｜ 🕒 儀表板同步時間：{sync_label}{fallback_badge} ｜ 總列數：{len(df):,} 筆</div>',
-    unsafe_allow_html=True
-)
+sync_meta_placeholder = st.empty()
 
 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
@@ -672,6 +672,26 @@ elif show_year_selector:
                 st.rerun()
 else:
     selected_years = []
+
+# 依目前選取的單位 / 階段 / 樣品 / 規格動態更新「資料最新檢驗日期」與筆數
+if len(raw_specs_list) > 0 and len(selected_specs) > 0:
+    scope_df = spec_df
+elif len(prod_df) > 0:
+    scope_df = prod_df
+elif len(stage_df) > 0:
+    scope_df = stage_df
+elif len(unit_df) > 0:
+    scope_df = unit_df
+else:
+    scope_df = df
+
+latest_data_date_str = get_latest_inspection_label(scope_df)
+sync_label = st.session_state.get("last_sync_time", "-")
+fallback_badge = "（快取備援中）" if st.session_state.get("is_fallback_sync") else ""
+sync_meta_placeholder.markdown(
+    f'<div class="sync-meta-bar">📅 資料最新檢驗日期（{selected_unit} / {selected_stage_label} / {selected_product or "-"}）：<b>{latest_data_date_str}</b> ｜ 🕒 儀表板同步時間：{sync_label}{fallback_badge} ｜ 目前範圍筆數：{len(scope_df):,} 筆（全表：{len(df):,} 筆）</div>',
+    unsafe_allow_html=True
+)
 
 filtered_df = final_df.copy()
 if has_valid_dates and len(filtered_df) > 0:
