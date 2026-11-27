@@ -793,6 +793,9 @@ xaxis_title_text = "日期"
 use_date_axis = False
 active_batch_col = None
 unique_batches = []
+unique_x_categories = []
+x_tick_vals = []
+x_tick_texts = []
 
 if len(raw_specs_list) > 0 and len(selected_specs) == 0:
     st.warning("尚未選擇項目")
@@ -849,6 +852,16 @@ elif len(filtered_df) > 0 and "測定值" in filtered_df.columns:
                 clean_data[active_batch_col] = pd.Categorical(clean_data[active_batch_col], categories=unique_batches, ordered=True)
                 clean_data = clean_data.sort_values(by=active_batch_col).reset_index(drop=True)
             xaxis_title_text = active_batch_col
+
+            def make_batch_hover_key(row):
+                b_val = str(row[active_batch_col]).strip()
+                yr_val = str(row["_year"]).strip() if "_year" in row and pd.notna(row["_year"]) and str(row["_year"]).strip() != "" else "未標示"
+                return f"{b_val}（檢驗年份：{yr_val}）"
+
+            clean_data["_x_hover_label"] = clean_data.apply(make_batch_hover_key, axis=1)
+            unique_x_categories = clean_data["_x_hover_label"].dropna().unique().tolist()
+            x_tick_vals = unique_x_categories
+            x_tick_texts = [re.sub(r"（檢驗年份：.*?）$", "", lbl) for lbl in unique_x_categories]
         else:
             clean_data = clean_data.reset_index(drop=True)
             unique_batches = []
@@ -1053,10 +1066,14 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 f_val = f"{curr_val:{plotly_fmt}}"
                 cdata.append(f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val))
         else:
-            px = target_df[active_batch_col].astype(str).tolist() if active_batch_col is not None else target_df.index.astype(str).tolist()
-            years_col_vals = target_df["_year"].tolist() if "_year" in target_df.columns else [None] * len(target_df)
-            for curr_val, raw_yr in zip(target_df["測定值"].tolist(), years_col_vals):
-                yr_str = str(raw_yr).strip() if pd.notna(raw_yr) and str(raw_yr).strip() != "" else "未標示"
+            if active_batch_col is not None and "_x_hover_label" in target_df.columns:
+                px = target_df["_x_hover_label"].astype(str).tolist()
+            elif active_batch_col is not None:
+                px = target_df[active_batch_col].astype(str).tolist()
+            else:
+                px = target_df.index.astype(str).tolist()
+
+            for curr_val in target_df["測定值"].tolist():
                 if pd.isna(curr_val):
                     py.append(None)
                     mc.append('#00000000')
@@ -1077,8 +1094,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 ms.append(m_sym)
                 msz.append(m_s)
                 f_val = f"{curr_val:{plotly_fmt}}"
-                val_html = f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val)
-                cdata.append(f"{val_html}（檢驗年份：{yr_str}）")
+                cdata.append(f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val))
         return px, py, mc, ms, msz, cdata
 
     color_palette = [
@@ -1100,7 +1116,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     ]
 
     fig = go.Figure()
-    hover_tpl = "%{fullSeries.name}: %{customdata}<extra></extra>" if not use_date_axis else "%{fullSeries.name}: %{customdata}<extra></extra>"
+    hover_tpl = "%{fullSeries.name}: %{customdata}<extra></extra>"
     
     if len(active_specs) > 1 and "取樣點/規格" in clean_data.columns:
         for idx, sub_spec in enumerate(active_specs):
@@ -1141,6 +1157,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         if lsl is not None:
             fig.add_hline(y=lsl, line_dash="dash", line_color="#ef4444", annotation_text=f"LSL: {fmt_str.format(lsl)}", annotation_font_color="#ef4444", annotation_position="bottom right")
 
+    active_category_array = unique_x_categories if unique_x_categories else (unique_batches if unique_batches else None)
+
     fig.update_layout(
         title=dict(text="", font=dict(color="#000000", size=1)),
         xaxis_title=dict(text=xaxis_title_text, font=dict(color="#000000", size=12)),
@@ -1155,7 +1173,10 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         xaxis=dict(
             type='date' if use_date_axis else 'category',
             categoryorder='array' if not use_date_axis else None,
-            categoryarray=unique_batches if not use_date_axis else None,
+            categoryarray=active_category_array if not use_date_axis else None,
+            tickmode='array' if (not use_date_axis and x_tick_vals) else 'auto',
+            tickvals=x_tick_vals if (not use_date_axis and x_tick_vals) else None,
+            ticktext=x_tick_texts if (not use_date_axis and x_tick_texts) else None,
             tickformat='%Y-%m-%d' if use_date_axis else None,
             tickfont=dict(color="#000000", size=10), title_font=dict(color="#000000"),
             tickangle=-45, nticks=30, showline=True, linewidth=1, linecolor='black', mirror=True,
@@ -1277,7 +1298,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         st.success("✅ 目前篩選範圍內的數據皆在管制與規格範圍內，無異常點。")
 
     with st.expander("點此查看該項目的完整歷史數據明細"):
-        st.dataframe(clean_data.drop(columns=["_dt", "測定值_str"], errors="ignore"), use_container_width=True, key="history_data_table")
+        st.dataframe(clean_data.drop(columns=["_dt", "測定值_str", "_x_hover_label"], errors="ignore"), use_container_width=True, key="history_data_table")
         
 elif len(raw_specs_list) > 0 or len(selected_specs) > 0:
     if has_valid_dates:
