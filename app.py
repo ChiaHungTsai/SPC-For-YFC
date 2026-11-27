@@ -1054,7 +1054,9 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 cdata.append(f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val))
         else:
             px = target_df[active_batch_col].astype(str).tolist() if active_batch_col is not None else target_df.index.astype(str).tolist()
-            for curr_val in target_df["測定值"].tolist():
+            years_col_vals = target_df["_year"].tolist() if "_year" in target_df.columns else [None] * len(target_df)
+            for curr_val, raw_yr in zip(target_df["測定值"].tolist(), years_col_vals):
+                yr_str = str(raw_yr).strip() if pd.notna(raw_yr) and str(raw_yr).strip() != "" else "未標示"
                 if pd.isna(curr_val):
                     py.append(None)
                     mc.append('#00000000')
@@ -1075,7 +1077,8 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
                 ms.append(m_sym)
                 msz.append(m_s)
                 f_val = f"{curr_val:{plotly_fmt}}"
-                cdata.append(f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val))
+                val_html = f"<span style='color: #dc2626; font-weight: bold;'>{f_val}</span>" if is_spec else (f"<span style='color: #f97316; font-weight: bold;'>{f_val}</span>" if is_ctrl else f_val)
+                cdata.append(f"{val_html}（檢驗年份：{yr_str}）")
         return px, py, mc, ms, msz, cdata
 
     color_palette = [
@@ -1097,6 +1100,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
     ]
 
     fig = go.Figure()
+    hover_tpl = "%{fullSeries.name}: %{customdata}<extra></extra>" if not use_date_axis else "%{fullSeries.name}: %{customdata}<extra></extra>"
     
     if len(active_specs) > 1 and "取樣點/規格" in clean_data.columns:
         for idx, sub_spec in enumerate(active_specs):
@@ -1107,7 +1111,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
             plot_x, plot_y, m_colors, m_symbols, m_sizes, custom_data = build_trace_points(sub_df, sub_color)
             fig.add_trace(go.Scatter(
                 x=plot_x, y=plot_y, mode='lines+markers', name=f"{sub_spec}",
-                hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
+                hovertemplate=hover_tpl,
                 customdata=custom_data, line=dict(color=sub_color, width=2.5),
                 marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols), connectgaps=False
             ))
@@ -1117,7 +1121,7 @@ if (len(raw_specs_list) == 0 or len(selected_specs) > 0) and len(clean_data) > 0
         single_trace_name = active_specs[0] if len(active_specs) == 1 else selected_param
         fig.add_trace(go.Scatter(
             x=plot_x, y=plot_y, mode='lines+markers', name=single_trace_name,
-            hovertemplate="%{fullSeries.name}: %{customdata}<extra></extra>",
+            hovertemplate=hover_tpl,
             customdata=custom_data, line=dict(color=first_color, width=2.5),
             marker=dict(size=m_sizes, color=m_colors, symbol=m_symbols), connectgaps=False
         ))
