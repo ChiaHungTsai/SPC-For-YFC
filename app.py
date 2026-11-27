@@ -689,7 +689,7 @@ latest_data_date_str = get_latest_inspection_label(scope_df)
 sync_label = st.session_state.get("last_sync_time", "-")
 fallback_badge = "（快取備援中）" if st.session_state.get("is_fallback_sync") else ""
 sync_meta_placeholder.markdown(
-    f'<div class="sync-meta-bar">📅 資料最新檢驗日期（{selected_unit} / {selected_stage_label} / {selected_product or "-"}）：<b>{latest_data_date_str}</b> ｜ 🕒 儀表板同步時間：{sync_label}{fallback_badge} ｜ 目前範圍筆數：{len(scope_df):,} 筆（全表：{len(df):,} 筆）</div>',
+    f'<div class="sync-meta-bar">📅 資料最新檢驗日期（{selected_unit} / {selected_stage_label} / {selected_product or "-"}）：<b>{latest_data_date_str}</b> ｜ 目前範圍筆數：{len(scope_df):,} 筆（全表：{len(df):,} 筆） ｜ 🕒 儀表板同步時間：{sync_label}{fallback_badge}</div>',
     unsafe_allow_html=True
 )
 
